@@ -1,0 +1,46 @@
+{
+  "name": "animal-vaccination-dashboard",
+  "version": "1.0.0",
+  "description": "Administrative dashboard for managing animal vaccination bookings",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "seed": "node src/seeds/index.js",
+    "test": "jest",
+    "client": "cd client && npm start",
+    "server": "npm run dev",
+    "both": "concurrently \"npm run server\" \"npm run client\"",
+    "build": "cd client && npm run build",
+    "heroku-postbuild": "cd client && npm install && npm run build"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "chart.js": "^4.5.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "express-async-errors": "^3.1.1",
+    "express-rate-limit": "^6.7.0",
+    "helmet": "^6.1.5",
+    "joi": "^17.9.1",
+    "jsonwebtoken": "^9.0.0",
+    "mongoose": "^7.0.3",
+    "morgan": "^1.10.0"
+  },
+  "devDependencies": {
+    "jest": "^29.5.0",
+    "nodemon": "^2.0.22",
+    "concurrently": "^7.6.0"
+  },
+  "keywords": [
+    "nodejs",
+    "express",
+    "mongodb",
+    "dashboard",
+    "veterinary",
+    "vaccination"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}
