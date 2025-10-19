@@ -66,7 +66,11 @@ const Bookings = () => {
       if (vaccinationsRes.ok) {
         const vaccinationsData = await vaccinationsRes.json();
         console.log('Vaccinations data:', vaccinationsData);
-        setVaccinations(vaccinationsData.data || vaccinationsData.data?.vaccinations || []);
+        const vaccinationsList = vaccinationsData.data?.vaccinations || vaccinationsData.data || [];
+        console.log('Vaccinations list:', vaccinationsList);
+        setVaccinations(vaccinationsList);
+      } else {
+        console.error('Failed to fetch vaccinations:', vaccinationsRes.status);
       }
 
       if (branchesRes.ok) {
@@ -101,25 +105,39 @@ const Bookings = () => {
   // فتح نموذج إضافة/تعديل
   const openModal = (booking = null) => {
     setEditingBooking(booking);
-    setFormData(booking ? {
-      customerId: booking.customer?._id || '',
-      animalName: booking.animal?.name || '',
-      animalType: booking.animal?.type || '',
-      vaccinationId: booking.vaccination?._id || '',
-      branchId: booking.branch?._id || '',
-      appointmentDate: booking.appointmentDate ? new Date(booking.appointmentDate).toISOString().split('T')[0] : '',
-      timeSlot: booking.appointmentTime || '',
-      notes: booking.notes || ''
-    } : {
-      customerId: '',
-      animalName: '',
-      animalType: '',
-      vaccinationId: '',
-      branchId: '',
-      appointmentDate: '',
-      timeSlot: '',
-      notes: ''
-    });
+    
+    if (booking) {
+      // إذا كان في وضع التعديل، ابحث عن العميل وحدده
+      const customer = customers.find(c => c._id === booking.customer?._id);
+      setSelectedCustomer(customer || null);
+      
+      setFormData({
+        customerId: booking.customer?._id || '',
+        animalId: booking.animal?._id || '',
+        animalName: booking.animal?.name || '',
+        animalType: booking.animal?.type || '',
+        vaccinationId: booking.vaccination?._id || booking.vaccination?.id || '',
+        branchId: booking.branch?._id || '',
+        appointmentDate: booking.appointmentDate ? new Date(booking.appointmentDate).toISOString().split('T')[0] : '',
+        timeSlot: booking.appointmentTime || booking.timeSlot || '',
+        notes: booking.notes || ''
+      });
+    } else {
+      // وضع الإضافة
+      setSelectedCustomer(null);
+      setFormData({
+        customerId: '',
+        animalId: '',
+        animalName: '',
+        animalType: '',
+        vaccinationId: '',
+        branchId: '',
+        appointmentDate: '',
+        timeSlot: '',
+        notes: ''
+      });
+    }
+    
     setShowModal(true);
   };
 
@@ -134,17 +152,40 @@ const Bookings = () => {
       
       const method = editingBooking ? 'PUT' : 'POST';
       
+      // البحث عن التطعيم المحدد للحصول على معلوماته
+      const selectedVaccination = vaccinations.find(v => v._id === formData.vaccinationId);
+      
+      if (!selectedVaccination) {
+        alert('الرجاء اختيار التطعيم');
+        return;
+      }
+      
       const bookingData = {
         customer: formData.customerId,
         animal: {
           name: formData.animalName,
-          type: formData.animalType
+          type: formData.animalType,
+          age: 0,
+          weight: 0
         },
-        vaccination: formData.vaccinationId,
+        vaccination: {
+          id: selectedVaccination._id,
+          type: selectedVaccination.name || selectedVaccination.nameAr,
+          name: selectedVaccination.nameAr || selectedVaccination.name,
+          nameAr: selectedVaccination.nameAr,
+          price: selectedVaccination.price,
+          duration: selectedVaccination.duration,
+          dosage: '1ml',
+          manufacturer: 'Veterinary Pharmaceuticals',
+          batchNumber: `B${Math.floor(Math.random() * 10000)}`,
+          expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
+        },
         branch: formData.branchId,
         appointmentDate: formData.appointmentDate,
         appointmentTime: formData.timeSlot,
-        notes: formData.notes
+        price: selectedVaccination.price,
+        paymentMethod: 'cash',
+        notes: formData.notes || ''
       };
       
       console.log('Sending booking data:', bookingData);
@@ -627,12 +668,42 @@ const Bookings = () => {
                     onChange={handleChange}
                   >
                     <option value="">اختر التطعيم</option>
-                    {Array.isArray(vaccinations) && vaccinations.map(vaccination => (
-                      <option key={vaccination._id} value={vaccination._id}>
-                        {vaccination.name} - {vaccination.price} ريال
-                      </option>
-                    ))}
+                    {(() => {
+                      console.log('Vaccinations in dropdown:', vaccinations);
+                      console.log('Is Array?', Array.isArray(vaccinations));
+                      console.log('Current animalType:', formData.animalType);
+                      
+                      if (!Array.isArray(vaccinations)) return null;
+                      
+                      const filtered = vaccinations.filter(vaccination => {
+                        // إذا كان هناك نوع حيوان محدد، اعرض التطعيمات المناسبة فقط
+                        if (formData.animalType) {
+                          return vaccination.animalTypes && vaccination.animalTypes.includes(formData.animalType);
+                        }
+                        // إذا لم يكن هناك نوع محدد، اعرض كل التطعيمات
+                        return true;
+                      });
+                      
+                      console.log('Filtered vaccinations:', filtered);
+                      
+                      return filtered.map(vaccination => (
+                        <option key={vaccination._id} value={vaccination._id}>
+                          {vaccination.nameAr || vaccination.name} - {vaccination.price} ريال
+                        </option>
+                      ));
+                    })()}
                   </select>
+                  {formData.animalType && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      عرض التطعيمات المناسبة لـ {
+                        formData.animalType === 'camel' ? 'الإبل' :
+                        formData.animalType === 'sheep' ? 'الأغنام' :
+                        formData.animalType === 'goat' ? 'الماعز' :
+                        formData.animalType === 'cow' ? 'الماشية' :
+                        formData.animalType === 'horse' ? 'الخيول' : 'الحيوانات'
+                      }
+                    </p>
+                  )}
                 </div>
 
                 <div>

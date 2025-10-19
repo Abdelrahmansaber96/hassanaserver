@@ -13,6 +13,7 @@ import BranchesNew from './pages/BranchesNew';
 import Consultations from './pages/Consultations';
 import Doctors from './pages/Doctors';
 import Notifications from './pages/Notifications';
+import Vaccinations from './pages/Vaccinations';
 
 // مكون لحماية الصفحات (يتطلب تسجيل دخول)
 const ProtectedRoute = ({ children }) => {
@@ -120,6 +121,14 @@ function App() {
             <ProtectedRoute>
               <DashboardLayout>
                 <Notifications />
+              </DashboardLayout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/vaccinations" element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <Vaccinations />
               </DashboardLayout>
             </ProtectedRoute>
           } />

@@ -14,7 +14,8 @@ import {
   Settings, 
   LogOut,
   X,
-  Stethoscope
+  Stethoscope,
+  Syringe
 } from 'lucide-react';
 
 const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
@@ -26,6 +27,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
     { id: 'dashboard', label: 'لوحة التحكم', icon: LayoutDashboard, path: '/' },
     { id: 'customers', label: 'إدارة العملاء', icon: Users, path: '/customers' },
     { id: 'bookings', label: 'إدارة الحجوزات', icon: Calendar, path: '/bookings' },
+    { id: 'vaccinations', label: 'إدارة التطعيمات', icon: Syringe, path: '/vaccinations' },
     { id: 'branches', label: 'إدارة الفروع', icon: MapPin, path: '/branches' },
     { id: 'doctors', label: 'إدارة الأطباء', icon: Stethoscope, path: '/doctors' },
     { id: 'consultations', label: 'الاستشارات', icon: Phone, path: '/consultations' },

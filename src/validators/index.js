@@ -152,18 +152,22 @@ const bookingValidator = Joi.object({
   }),
   animal: Joi.object({
     name: Joi.string().min(1).max(50).required(),
-    type: Joi.string().valid('camel', 'sheep', 'goat', 'cow', 'other').required(),
+    type: Joi.string().valid('camel', 'sheep', 'goat', 'cow', 'horse', 'other').required(),
     age: Joi.number().min(0).max(50).optional(),
     weight: Joi.number().min(0).max(2000).optional(),
     breed: Joi.string().max(50).optional()
   }).required(),
   vaccination: Joi.object({
+    id: Joi.string().hex().length(24).optional(),
     type: Joi.string().min(1).max(100).required(),
     name: Joi.string().min(1).max(100).required(),
+    nameAr: Joi.string().min(1).max(100).optional(),
+    price: Joi.number().min(0).optional(),
+    duration: Joi.number().min(1).optional(),
     dosage: Joi.string().max(50).optional(),
     manufacturer: Joi.string().max(100).optional(),
     batchNumber: Joi.string().max(50).optional(),
-    expiryDate: Joi.date().min('now').optional()
+    expiryDate: Joi.date().optional()
   }).required(),
   appointmentDate: Joi.date().min('now').required().messages({
     'date.min': 'Appointment date cannot be in the past',
@@ -376,7 +380,8 @@ const vaccinationValidator = Joi.object({
   sideEffects: Joi.array().items(Joi.string().max(200)).optional(),
   sideEffectsAr: Joi.array().items(Joi.string().max(200)).optional(),
   instructions: Joi.string().max(1000).optional(),
-  instructionsAr: Joi.string().max(1000).optional()
+  instructionsAr: Joi.string().max(1000).optional(),
+  isActive: Joi.boolean().optional()
 });
 
 const updateVaccinationValidator = vaccinationValidator.fork(
