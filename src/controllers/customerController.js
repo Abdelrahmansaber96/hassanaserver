@@ -17,6 +17,12 @@ const getCustomer = asyncHandler(async (req, res) => {
 });
 
 const createCustomer = asyncHandler(async (req, res) => {
+  // التحقق من عدم وجود رقم الهاتف مسبقاً
+  const existingCustomer = await Customer.findOne({ phone: req.body.phone });
+  if (existingCustomer) {
+    return sendError(res, 'رقم الهاتف موجود مسبقاً. الرجاء استخدام رقم آخر', 400);
+  }
+  
   const customer = await Customer.create(req.body);
   sendSuccess(res, customer, 'Customer created successfully', 201);
 });

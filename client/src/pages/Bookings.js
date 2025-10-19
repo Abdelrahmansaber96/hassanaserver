@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Edit, Trash2, Calendar, Clock, User, MapPin } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Calendar, Clock, User, MapPin, File ,CircleCheckBig, Bell, X} from 'lucide-react';
 
 const Bookings = () => {
   const [bookings, setBookings] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [vaccinations, setVaccinations] = useState([]);
   const [branches, setBranches] = useState([]);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -13,6 +14,7 @@ const Bookings = () => {
   const [editingBooking, setEditingBooking] = useState(null);
   const [formData, setFormData] = useState({
     customerId: '',
+    animalId: '',
     animalName: '',
     animalType: '',
     vaccinationId: '',
@@ -57,17 +59,20 @@ const Bookings = () => {
 
       if (customersRes.ok) {
         const customersData = await customersRes.json();
-        setCustomers(customersData.data.customers || []);
+        console.log('Customers data:', customersData);
+        setCustomers(customersData.data || customersData.data?.customers || []);
       }
 
       if (vaccinationsRes.ok) {
         const vaccinationsData = await vaccinationsRes.json();
-        setVaccinations(vaccinationsData.data.vaccinations || []);
+        console.log('Vaccinations data:', vaccinationsData);
+        setVaccinations(vaccinationsData.data || vaccinationsData.data?.vaccinations || []);
       }
 
       if (branchesRes.ok) {
         const branchesData = await branchesRes.json();
-        setBranches(branchesData.data.branches || []);
+        console.log('Branches data:', branchesData);
+        setBranches(branchesData.data || branchesData.data?.branches || []);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -123,41 +128,55 @@ const Bookings = () => {
     e.preventDefault();
     
     try {
-      const token = localStorage.getItem('token');
       const url = editingBooking 
-        ? `/api/bookings/${editingBooking._id}`
-        : '/api/bookings';
+        ? `${API_BASE_URL}/api/bookings/${editingBooking._id}`
+        : `${API_BASE_URL}/api/bookings`;
       
       const method = editingBooking ? 'PUT' : 'POST';
       
-      const response = await fetch(url, {
+      const bookingData = {
+        customer: formData.customerId,
+        animal: {
+          name: formData.animalName,
+          type: formData.animalType
+        },
+        vaccination: formData.vaccinationId,
+        branch: formData.branchId,
+        appointmentDate: formData.appointmentDate,
+        appointmentTime: formData.timeSlot,
+        notes: formData.notes
+      };
+      
+      console.log('Sending booking data:', bookingData);
+      
+      const response = await authorizedFetch(url.replace(API_BASE_URL, ''), {
         method,
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          customer: formData.customerId,
-          animal: {
-            name: formData.animalName,
-            type: formData.animalType
-          },
-          vaccination: formData.vaccinationId,
-          branch: formData.branchId,
-          appointmentDate: formData.appointmentDate,
-          appointmentTime: formData.timeSlot,
-          notes: formData.notes
-        })
+        body: JSON.stringify(bookingData)
       });
+
+      const data = await response.json();
+      console.log('Response:', data);
 
       if (response.ok) {
         setShowModal(false);
+        setSelectedCustomer(null);
         fetchData();
         alert(editingBooking ? 'تم تحديث الحجز بنجاح' : 'تم إضافة الحجز بنجاح');
+      } else {
+        let errorMessage = 'حدث خطأ أثناء الحفظ';
+        if (data.errors && data.errors.length > 0) {
+          errorMessage = data.errors.map(err => `${err.field}: ${err.message}`).join('\n');
+        } else if (data.message) {
+          errorMessage = data.message;
+        }
+        alert(errorMessage);
       }
     } catch (error) {
       console.error('Error saving booking:', error);
-      alert('حدث خطأ أثناء الحفظ');
+      alert('حدث خطأ أثناء الحفظ: ' + error.message);
     }
   };
 
@@ -208,10 +227,36 @@ const Bookings = () => {
   };
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+    const { name, value } = e.target;
+    
+    // عند اختيار عميل، نجلب بياناته وحيواناته
+    if (name === 'customerId') {
+      const customer = customers.find(c => c._id === value);
+      setSelectedCustomer(customer);
+      setFormData({
+        ...formData,
+        customerId: value,
+        animalId: '',
+        animalName: '',
+        animalType: ''
+      });
+    }
+    // عند اختيار حيوان من حيوانات العميل
+    else if (name === 'animalId' && selectedCustomer) {
+      const animal = selectedCustomer.animals.find(a => a._id === value);
+      setFormData({
+        ...formData,
+        animalId: value,
+        animalName: animal?.name || '',
+        animalType: animal?.type || ''
+      });
+    }
+    else {
+      setFormData({
+        ...formData,
+        [name]: value
+      });
+    }
   };
 
   // دالة لتحديد لون الحالة
@@ -245,7 +290,7 @@ const Bookings = () => {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-6 mt-14">
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
@@ -292,25 +337,12 @@ const Bookings = () => {
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center">
             <div className="p-2 bg-blue-100 rounded-lg">
-              <Calendar className="h-6 w-6 text-blue-600" />
+              <File className="h-6 w-6 text-blue-600" />
             </div>
             <div className="mr-4">
-              <h3 className="text-lg font-semibold text-gray-900">{bookings.length}</h3>
+             
               <p className="text-gray-600">إجمالي الحجوزات</p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-yellow-100 rounded-lg">
-              <Clock className="h-6 w-6 text-yellow-600" />
-            </div>
-            <div className="mr-4">
-              <h3 className="text-lg font-semibold text-gray-900">
-                {bookings.filter(b => b.status === 'pending').length}
-              </h3>
-              <p className="text-gray-600">في الانتظار</p>
+               <h3 className="text-lg font-semibold text-gray-900">{bookings.length}</h3>
             </div>
           </div>
         </div>
@@ -318,27 +350,44 @@ const Bookings = () => {
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center">
             <div className="p-2 bg-green-100 rounded-lg">
-              <Calendar className="h-6 w-6 text-green-600" />
+              <CircleCheckBig className="h-6 w-6 text-white-600" />
             </div>
             <div className="mr-4">
+              
+              <p className="text-gray-600">الحجوزات المؤكدة</p>
               <h3 className="text-lg font-semibold text-gray-900">
                 {bookings.filter(b => b.status === 'confirmed').length}
               </h3>
-              <p className="text-gray-600">مؤكد</p>
             </div>
           </div>
         </div>
         
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Calendar className="h-6 w-6 text-blue-600" />
+            <div className="p-2 bg-yellow-100 rounded-lg">
+              <Bell className="h-6 w-6 text-yellow-600" />
             </div>
             <div className="mr-4">
+              
+              <p className="text-gray-600">الحجوزات المعلقة</p>
               <h3 className="text-lg font-semibold text-gray-900">
-                {bookings.filter(b => b.status === 'completed').length}
+                {bookings.filter(b => b.status === 'pending').length}
               </h3>
-              <p className="text-gray-600">مكتمل</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-red-100 rounded-lg">
+              <X className="h-6 w-6 text-red-600" />
+            </div>
+            <div className="mr-4">
+              
+              <p className="text-gray-600">الحجوزات الملغاة</p>
+              <h3 className="text-lg font-semibold text-gray-900">
+                {bookings.filter(b => b.status === 'cancelled').length}
+              </h3>
             </div>
           </div>
         </div>
@@ -374,7 +423,7 @@ const Bookings = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredBookings.map((booking) => (
+              {Array.isArray(filteredBookings) && filteredBookings.map((booking) => (
                 <tr key={booking._id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">
                     {booking.bookingNumber}
@@ -476,9 +525,9 @@ const Bookings = () => {
             
             <form onSubmit={handleSave} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
+                <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    العميل
+                    العميل *
                   </label>
                   <select
                     name="customerId"
@@ -488,47 +537,83 @@ const Bookings = () => {
                     onChange={handleChange}
                   >
                     <option value="">اختر العميل</option>
-                    {customers.map(customer => (
+                    {Array.isArray(customers) && customers.map(customer => (
                       <option key={customer._id} value={customer._id}>
                         {customer.name} - {customer.phone}
                       </option>
                     ))}
                   </select>
+                  {Array.isArray(customers) && customers.length === 0 && (
+                    <p className="text-xs text-red-500 mt-1">لا يوجد عملاء! الرجاء إضافة عملاء أولاً</p>
+                  )}
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    اسم الحيوان
-                  </label>
-                  <input
-                    type="text"
-                    name="animalName"
-                    required
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    value={formData.animalName}
-                    onChange={handleChange}
-                  />
-                </div>
+                {selectedCustomer && selectedCustomer.animals && selectedCustomer.animals.length > 0 ? (
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      الحيوان (من حيوانات العميل) *
+                    </label>
+                    <select
+                      name="animalId"
+                      required
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      value={formData.animalId}
+                      onChange={handleChange}
+                    >
+                      <option value="">اختر الحيوان</option>
+                      {Array.isArray(selectedCustomer.animals) && selectedCustomer.animals.map(animal => (
+                        <option key={animal._id} value={animal._id}>
+                          {animal.name} - {animal.type === 'camel' ? 'إبل' : animal.type === 'sheep' ? 'أغنام' : animal.type === 'goat' ? 'ماعز' : animal.type === 'cow' ? 'ماشية' : 'خيول'}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : selectedCustomer ? (
+                  <div className="md:col-span-2 bg-yellow-50 border border-yellow-200 rounded-md p-3">
+                    <p className="text-sm text-yellow-800">
+                      ⚠️ هذا العميل ليس لديه حيوانات مسجلة. الرجاء إدخال بيانات الحيوان يدوياً:
+                    </p>
+                  </div>
+                ) : null}
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    نوع الحيوان
-                  </label>
-                  <select
-                    name="animalType"
-                    required
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    value={formData.animalType}
-                    onChange={handleChange}
-                  >
-                    <option value="">اختر النوع</option>
-                    <option value="camel">إبل</option>
-                    <option value="sheep">أغنام</option>
-                    <option value="goat">ماعز</option>
-                    <option value="cow">ماشية</option>
-                    <option value="horse">خيول</option>
-                  </select>
-                </div>
+                {(!selectedCustomer || !selectedCustomer.animals || selectedCustomer.animals.length === 0) && formData.customerId && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        اسم الحيوان *
+                      </label>
+                      <input
+                        type="text"
+                        name="animalName"
+                        required
+                        placeholder="مثال: بدر"
+                        className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        value={formData.animalName}
+                        onChange={handleChange}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        نوع الحيوان *
+                      </label>
+                      <select
+                        name="animalType"
+                        required
+                        className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        value={formData.animalType}
+                        onChange={handleChange}
+                      >
+                        <option value="">اختر النوع</option>
+                        <option value="camel">إبل</option>
+                        <option value="sheep">أغنام</option>
+                        <option value="goat">ماعز</option>
+                        <option value="cow">ماشية</option>
+                        <option value="horse">خيول</option>
+                      </select>
+                    </div>
+                  </>
+                )}
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -542,7 +627,7 @@ const Bookings = () => {
                     onChange={handleChange}
                   >
                     <option value="">اختر التطعيم</option>
-                    {vaccinations.map(vaccination => (
+                    {Array.isArray(vaccinations) && vaccinations.map(vaccination => (
                       <option key={vaccination._id} value={vaccination._id}>
                         {vaccination.name} - {vaccination.price} ريال
                       </option>
@@ -562,7 +647,7 @@ const Bookings = () => {
                     onChange={handleChange}
                   >
                     <option value="">اختر الفرع</option>
-                    {branches.map(branch => (
+                    {Array.isArray(branches) && branches.map(branch => (
                       <option key={branch._id} value={branch._id}>
                         {branch.name} - {branch.location}
                       </option>

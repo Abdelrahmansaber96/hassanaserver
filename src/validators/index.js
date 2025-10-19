@@ -109,6 +109,26 @@ const customerValidator = Joi.object({
   notes: Joi.string().max(500).optional()
 });
 
+// Dashboard customer validator (animals optional)
+const dashboardCustomerValidator = Joi.object({
+  name: Joi.string().min(2).max(100).required().messages({
+    'string.min': 'اسم العميل يجب أن يكون حرفين على الأقل',
+    'string.max': 'اسم العميل لا يمكن أن يتجاوز 100 حرف',
+    'any.required': 'اسم العميل مطلوب'
+  }),
+  phone: Joi.string().pattern(/^((\+966|00966|966|0)?5[0-9]{8})$/).required().messages({
+    'string.pattern.base': 'الرجاء إدخال رقم هاتف سعودي صحيح (مثال: 0501234567)',
+    'any.required': 'رقم الهاتف مطلوب'
+  }),
+  email: Joi.string().email().optional().allow('').messages({
+    'string.email': 'الرجاء إدخال بريد إلكتروني صحيح'
+  }),
+  address: Joi.string().max(200).optional().allow(''),
+  city: Joi.string().max(50).optional().allow(''),
+  animals: Joi.array().items(animalSchema).optional(),
+  notes: Joi.string().max(500).optional().allow('')
+});
+
 const updateCustomerValidator = customerValidator.fork(
   ['phone', 'animals'], 
   (schema) => schema.optional()
@@ -428,6 +448,7 @@ module.exports = {
   
   // Customer validators
   customerValidator,
+  dashboardCustomerValidator,
   simpleCustomerValidator,
   customerLoginValidator,
   updateCustomerValidator,

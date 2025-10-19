@@ -15,7 +15,7 @@ const {
 const auth = require('../middlewares/auth');
 const { authorize, checkActionPermission } = require('../middlewares/authorize');
 const { validate } = require('../validators');
-const { customerValidator, updateCustomerValidator } = require('../validators');
+const { customerValidator, dashboardCustomerValidator, simpleCustomerValidator, updateCustomerValidator } = require('../validators');
 
 const router = express.Router();
 
@@ -28,7 +28,7 @@ router.get('/stats', checkActionPermission('read', 'customer'), getCustomerStats
 // Customer CRUD
 router.route('/')
   .get(checkActionPermission('read', 'customer'), getCustomers)
-  .post(checkActionPermission('create', 'customer'), validate(customerValidator), createCustomer);
+  .post(checkActionPermission('create', 'customer'), validate(dashboardCustomerValidator), createCustomer);
 
 router.route('/:id')
   .get(checkActionPermission('read', 'customer'), getCustomer)

@@ -89,6 +89,8 @@ const Customers = () => {
       
       const method = editingCustomer ? 'PUT' : 'POST';
       
+      console.log('Sending data:', formData);
+      
       const response = await authorizedFetch(url, {
         method,
         headers: {
@@ -97,10 +99,22 @@ const Customers = () => {
         body: JSON.stringify(formData)
       });
 
+      const data = await response.json();
+      console.log('Response:', data);
+
       if (response.ok) {
         setShowModal(false);
         fetchCustomers();
         alert(editingCustomer ? 'تم تحديث العميل بنجاح' : 'تم إضافة العميل بنجاح');
+      } else {
+        // عرض رسالة الخطأ
+        let errorMessage = 'حدث خطأ أثناء الحفظ';
+        if (data.errors && data.errors.length > 0) {
+          errorMessage = data.errors.map(err => `${err.field}: ${err.message}`).join('\n');
+        } else if (data.message) {
+          errorMessage = data.message;
+        }
+        alert(errorMessage);
       }
     } catch (error) {
       console.error('Error saving customer:', error);
@@ -143,7 +157,7 @@ const Customers = () => {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-6 mt-14">
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
@@ -302,10 +316,14 @@ const Customers = () => {
                   type="tel"
                   name="phone"
                   required
+                  placeholder="05XXXXXXXX"
                   className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={formData.phone}
                   onChange={handleChange}
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  أدخل رقم الهاتف بصيغة سعودية (مثال: 0501234567)
+                </p>
               </div>
 
               <div>
