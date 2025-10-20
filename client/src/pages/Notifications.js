@@ -51,9 +51,16 @@ const Notifications = () => {
       setLoading(true);
       const response = await authorizedFetch('/api/notifications');
       
+      console.log('Notifications response status:', response.status);
+      
       if (response.ok) {
         const data = await response.json();
-        setNotifications(data.data || data);
+        console.log('Notifications response data:', data);
+        const notificationsList = data.data?.notifications || data.data || data || [];
+        console.log('Notifications list:', notificationsList);
+        setNotifications(notificationsList);
+      } else {
+        console.error('Failed to fetch notifications:', response.status);
       }
     } catch (error) {
       console.error('Error fetching notifications:', error);
@@ -76,6 +83,8 @@ const Notifications = () => {
     }
 
     try {
+      console.log('Sending notification data:', formData);
+      
       const response = await authorizedFetch('/api/notifications', {
         method: 'POST',
         headers: {
@@ -83,6 +92,9 @@ const Notifications = () => {
         },
         body: JSON.stringify(formData)
       });
+
+      const data = await response.json();
+      console.log('Response:', data);
 
       if (response.ok) {
         await fetchNotifications();
@@ -100,8 +112,14 @@ const Notifications = () => {
         });
         alert('تم إرسال الإشعار بنجاح');
       } else {
-        const error = await response.json();
-        alert(error.message || 'حدث خطأ أثناء الإرسال');
+        // عرض الأخطاء بالتفصيل
+        let errorMessage = 'حدث خطأ أثناء الإرسال';
+        if (data.errors && Array.isArray(data.errors)) {
+          errorMessage = data.errors.map(err => `${err.field}: ${err.message}`).join('\n');
+        } else if (data.message) {
+          errorMessage = data.message;
+        }
+        alert(errorMessage);
       }
     } catch (error) {
       console.error('Error sending notification:', error);

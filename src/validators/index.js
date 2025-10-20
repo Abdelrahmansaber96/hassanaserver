@@ -202,29 +202,46 @@ const updateBookingStatusValidator = Joi.object({
 // Branch validators
 const branchValidator = Joi.object({
   name: Joi.string().min(2).max(100).required(),
-  code: Joi.string().min(2).max(10).uppercase().required(),
-  address: Joi.string().min(5).max(200).required(),
+  location: Joi.string().min(5).max(200).required(),
   city: Joi.string().min(2).max(50).required(),
-  phone: Joi.string().pattern(/^(\+966|966|0)?[0-9]{9}$/).required(),
-  email: Joi.string().email().optional(),
-  manager: Joi.string().hex().length(24).optional(),
+  province: Joi.string().min(2).max(50).optional().allow(''),
+  phone: Joi.string().pattern(/^(\+966|966|0)?[0-9]{9}$/).optional().allow(''),
+  email: Joi.string().email().optional().allow(''),
+  manager: Joi.string().optional().allow(''),
   workingHours: Joi.object({
-    start: Joi.string().pattern(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).default('08:00'),
-    end: Joi.string().pattern(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).default('18:00')
-  }).optional(),
-  workingDays: Joi.array().items(
-    Joi.string().valid('sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday')
-  ).min(1).optional(),
-  capacity: Joi.number().min(1).max(500).default(50),
-  facilities: Joi.array().items(Joi.string().max(100)).optional(),
+    start: Joi.string().pattern(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).optional().default('08:00'),
+    end: Joi.string().pattern(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).optional().default('18:00')
+  }).optional().default({ start: '08:00', end: '18:00' }),
+  workingDays: Joi.array().items(Joi.string()).optional().default([]),
+  services: Joi.array().items(Joi.string()).optional().default([]),
+  capacity: Joi.alternatives().try(
+    Joi.number().min(1).max(500),
+    Joi.string().allow('')
+  ).optional(),
+  image: Joi.string().optional().allow(''),
+  rating: Joi.alternatives().try(
+    Joi.number().min(0).max(5),
+    Joi.string().allow('')
+  ).optional().default(0),
+  description: Joi.string().max(500).optional().allow(''),
+  isActive: Joi.boolean().optional().default(true),
   coordinates: Joi.object({
-    latitude: Joi.number().min(-90).max(90),
-    longitude: Joi.number().min(-180).max(180)
-  }).optional()
+    lat: Joi.alternatives().try(
+      Joi.number().min(-90).max(90),
+      Joi.string().allow('')
+    ).optional().default(0),
+    lng: Joi.alternatives().try(
+      Joi.number().min(-180).max(180),
+      Joi.string().allow('')
+    ).optional().default(0),
+    // Allow old field names but strip them
+    latitude: Joi.any().strip(),
+    longitude: Joi.any().strip()
+  }).optional().default({ lat: 0, lng: 0 })
 });
 
 const updateBranchValidator = branchValidator.fork(
-  ['name', 'code', 'address', 'city', 'phone'], 
+  ['name', 'location', 'city'], 
   (schema) => schema.optional()
 );
 
@@ -300,7 +317,18 @@ const updateOfferValidator = offerValidator.fork(
 const notificationValidator = Joi.object({
   title: Joi.string().min(5).max(100).required(),
   message: Joi.string().min(10).max(1000).required(),
-  type: Joi.string().valid('booking', 'consultation', 'offer', 'reminder', 'system').required(),
+  type: Joi.string().valid(
+    'general',
+    'booking',
+    'booking_reminder',
+    'booking_confirmed',
+    'consultation',
+    'consultation_scheduled',
+    'payment_received',
+    'offer',
+    'reminder',
+    'system'
+  ).required(),
   priority: Joi.string().valid('low', 'medium', 'high', 'urgent').default('medium'),
   recipients: Joi.string().valid('all', 'customers', 'staff', 'doctors', 'admins', 'specific').required(),
   specificRecipients: Joi.array().items(Joi.string().hex().length(24)).when('recipients', {
@@ -309,7 +337,8 @@ const notificationValidator = Joi.object({
     otherwise: Joi.array().optional()
   }),
   channels: Joi.array().items(Joi.string().valid('app', 'email', 'sms', 'whatsapp', 'push')).min(1).default(['app']),
-  scheduledAt: Joi.date().min('now').optional(),
+  scheduledAt: Joi.date().min('now').optional().allow(''),
+  status: Joi.string().valid('draft', 'scheduled', 'sent', 'failed').optional(),
   relatedEntity: Joi.object({
     entityType: Joi.string().valid('booking', 'consultation', 'offer', 'customer', 'user'),
     entityId: Joi.string().hex().length(24)

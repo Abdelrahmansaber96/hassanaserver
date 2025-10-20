@@ -29,7 +29,18 @@ module.exports = {
   CONSULTATION_STATUS: ['scheduled', 'in_progress', 'completed', 'cancelled'],
   
   // Notification Types
-  NOTIFICATION_TYPES: ['booking', 'consultation', 'offer', 'reminder', 'system'],
+  NOTIFICATION_TYPES: [
+    'general',
+    'booking',
+    'booking_reminder',
+    'booking_confirmed',
+    'consultation',
+    'consultation_scheduled',
+    'payment_received',
+    'offer',
+    'reminder',
+    'system'
+  ],
   
   // Generate JWT Token
   generateToken: (payload) => {

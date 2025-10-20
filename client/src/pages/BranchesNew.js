@@ -152,28 +152,56 @@ const BranchesNew = () => {
     }
 
     try {
-      const token = localStorage.getItem('token');
       const url = editingBranch 
         ? `/api/branches/${editingBranch._id}`
         : '/api/branches';
       const method = editingBranch ? 'PUT' : 'POST';
       
-      const response = await fetch(url, {
+      // تنظيف البيانات قبل الإرسال
+      const branchData = { ...formData };
+      
+      // إزالة coordinates إذا كانت القيم الافتراضية (0, 0)
+      if (branchData.coordinates && 
+          branchData.coordinates.lat === 0 && 
+          branchData.coordinates.lng === 0) {
+        delete branchData.coordinates;
+      }
+      
+      // إزالة الحقول الفارغة
+      Object.keys(branchData).forEach(key => {
+        if (branchData[key] === '' || branchData[key] === null || branchData[key] === undefined) {
+          delete branchData[key];
+        }
+      });
+      
+      console.log('Sending branch data:', branchData);
+      
+      const response = await authorizedFetch(url, {
         method,
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(branchData)
       });
 
+      console.log('Response status:', response.status);
+      
       if (response.ok) {
         await fetchBranches();
         setShowModal(false);
         setEditingBranch(null);
+        alert(editingBranch ? 'تم تحديث الفرع بنجاح' : 'تم إضافة الفرع بنجاح');
       } else {
         const error = await response.json();
-        alert(error.message || 'حدث خطأ أثناء الحفظ');
+        console.error('Server error:', error);
+        
+        let errorMessage = 'حدث خطأ أثناء الحفظ';
+        if (error.errors && Array.isArray(error.errors)) {
+          errorMessage = error.errors.map(err => `${err.field}: ${err.message}`).join('\n');
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+        alert(errorMessage);
       }
     } catch (error) {
       console.error('Error saving branch:', error);
@@ -191,16 +219,16 @@ const BranchesNew = () => {
     if (!window.confirm('هل أنت متأكد من حذف هذا الفرع؟')) return;
 
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/branches/${branchId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+      const response = await authorizedFetch(`/api/branches/${branchId}`, {
+        method: 'DELETE'
       });
 
       if (response.ok) {
         await fetchBranches();
+        alert('تم حذف الفرع بنجاح');
+      } else {
+        const error = await response.json();
+        alert(error.message || 'حدث خطأ أثناء الحذف');
       }
     } catch (error) {
       console.error('Error deleting branch:', error);
@@ -272,7 +300,7 @@ const BranchesNew = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <button className="flex items-center gap-2 text-blue-600 hover:text-blue-700">
+              <button onClick={() => openModal()} className="flex items-center gap-2 text-blue-600 hover:text-blue-700">
                 <Plus className="h-5 w-5" />
                 <span className="font-medium">إضافة فرع جديد</span>
               </button>
@@ -754,19 +782,7 @@ const BranchesNew = () => {
         )}
       </AnimatePresence>
 
-      {/* FAB Button */}
-      {user?.role === 'admin' && (
-        <motion.button
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
-          onClick={() => openModal()}
-          className="fixed bottom-8 left-8 bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700"
-        >
-          <Plus className="h-6 w-6" />
-        </motion.button>
-      )}
+    
     </div>
   );
 };

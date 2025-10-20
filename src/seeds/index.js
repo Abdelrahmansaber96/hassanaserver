@@ -48,42 +48,48 @@ const seedBranches = async () => {
   const branches = [
     {
       name: 'فرع الرياض الرئيسي',
-      code: 'RYD001',
-      address: 'طريق الملك فهد، حي العليا',
+      location: 'طريق الملك فهد، حي العليا',
       city: 'الرياض',
+      province: 'الرياض',
       phone: '+966112345678',
       email: 'riyadh@clinic.com',
+      manager: 'أحمد محمد',
       workingHours: { start: '08:00', end: '20:00' },
-      workingDays: ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+      workingDays: ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'],
+      services: ['تطعيمات الإبل', 'تطعيمات الأغنام', 'تطعيمات الماعز', 'استشارات طبية'],
       capacity: 100,
-      facilities: ['غرف فحص', 'مختبر', 'صيدلية', 'موقف سيارات'],
-      coordinates: { latitude: 24.7136, longitude: 46.6753 }
+      description: 'الفرع الرئيسي في العاصمة الرياض',
+      rating: 4.8
     },
     {
       name: 'فرع جدة',
-      code: 'JED001',
-      address: 'طريق الأمير محمد بن عبدالعزيز',
+      location: 'طريق الأمير محمد بن عبدالعزيز',
       city: 'جدة',
+      province: 'مكة المكرمة',
       phone: '+966126543210',
       email: 'jeddah@clinic.com',
+      manager: 'خالد العتيبي',
       workingHours: { start: '09:00', end: '18:00' },
-      workingDays: ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday'],
+      workingDays: ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'],
+      services: ['تطعيمات الإبل', 'تطعيمات الماشية', 'فحوصات طبية'],
       capacity: 75,
-      facilities: ['غرف فحص', 'موقف سيارات'],
-      coordinates: { latitude: 21.3891, longitude: 39.8579 }
+      description: 'فرع جدة على ساحل البحر الأحمر',
+      rating: 4.5
     },
     {
       name: 'فرع الدمام',
-      code: 'DMM001',
-      address: 'طريق الملك سعود',
+      location: 'طريق الملك سعود',
       city: 'الدمام',
+      province: 'الشرقية',
       phone: '+966138765432',
       email: 'dammam@clinic.com',
+      manager: 'سعيد الدوسري',
       workingHours: { start: '08:30', end: '19:00' },
-      workingDays: ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+      workingDays: ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'],
+      services: ['تطعيمات الأغنام', 'تطعيمات الماعز', 'استشارات طبية'],
       capacity: 60,
-      facilities: ['غرف فحص', 'مختبر'],
-      coordinates: { latitude: 26.4207, longitude: 50.0888 }
+      description: 'فرع الدمام في المنطقة الشرقية',
+      rating: 4.6
     }
   ];
 

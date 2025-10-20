@@ -19,6 +19,7 @@ const Doctors = () => {
     name: '',
     email: '',
     phone: '',
+    password: '', // إضافة حقل password
     specialization: '',
     branch: '',
     qualification: '',
@@ -152,6 +153,31 @@ const Doctors = () => {
     setShowModal(true);
   };
 
+  // إعادة تعيين النموذج
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      email: '',
+      phone: '',
+      password: '', // إضافة حقل password
+      specialization: '',
+      branch: '',
+      qualification: '',
+      experience: '',
+      consultationFee: '',
+      workingHours: { start: '08:00', end: '17:00' },
+      workingDays: [],
+      languages: [],
+      image: '',
+      rating: 0,
+      bio: '',
+      licenseNumber: '',
+      isActive: true
+    });
+    setImagePreview('');
+    setEditingDoctor(null);
+  };
+
   // حفظ الطبيب
   const handleSave = async (e) => {
     e.preventDefault();
@@ -162,34 +188,64 @@ const Doctors = () => {
     }
 
     try {
-      const token = localStorage.getItem('token');
       const url = editingDoctor 
         ? `/api/doctors/${editingDoctor._id}`
         : '/api/doctors';
       const method = editingDoctor ? 'PUT' : 'POST';
       
+      // تنظيف البيانات: إزالة الحقول الفارغة
       const doctorData = {
         ...formData,
         role: 'doctor'
       };
+      
+      // إزالة password عند التعديل (فقط للإضافة)
+      if (editingDoctor) {
+        delete doctorData.password;
+      }
+      
+      // إزالة branch إذا كان فارغاً
+      if (!doctorData.branch || doctorData.branch === '') {
+        delete doctorData.branch;
+      }
+      
+      // إزالة image إذا كان فارغاً
+      if (!doctorData.image || doctorData.image === '') {
+        delete doctorData.image;
+      }
+      
+      // إزالة licenseNumber إذا كان فارغاً
+      if (!doctorData.licenseNumber || doctorData.licenseNumber === '') {
+        delete doctorData.licenseNumber;
+      }
 
-      const response = await fetch(url, {
+      console.log('Saving doctor data:', doctorData);
+
+      const response = await authorizedFetch(url, {
         method,
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(doctorData)
       });
+
+      const data = await response.json();
+      console.log('Response:', data);
 
       if (response.ok) {
         await fetchDoctors();
         setShowModal(false);
         setEditingDoctor(null);
+        resetForm();
         alert(editingDoctor ? 'تم تحديث بيانات الطبيب بنجاح' : 'تم إضافة الطبيب بنجاح');
       } else {
-        const error = await response.json();
-        alert(error.message || 'حدث خطأ أثناء الحفظ');
+        let errorMessage = 'حدث خطأ أثناء الحفظ';
+        if (data.errors && Array.isArray(data.errors)) {
+          errorMessage = data.errors.map(err => `${err.field}: ${err.message}`).join('\n');
+        } else if (data.message) {
+          errorMessage = data.message;
+        }
+        alert(errorMessage);
       }
     } catch (error) {
       console.error('Error saving doctor:', error);
@@ -207,17 +263,16 @@ const Doctors = () => {
     if (!window.confirm('هل أنت متأكد من حذف هذا الطبيب؟')) return;
 
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/doctors/${doctorId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+      const response = await authorizedFetch(`/api/doctors/${doctorId}`, {
+        method: 'DELETE'
       });
 
       if (response.ok) {
         await fetchDoctors();
         alert('تم حذف الطبيب بنجاح');
+      } else {
+        const data = await response.json();
+        alert(data.message || 'حدث خطأ أثناء الحذف');
       }
     } catch (error) {
       console.error('Error deleting doctor:', error);
@@ -555,6 +610,25 @@ const Doctors = () => {
                       placeholder="+966xxxxxxxxx"
                     />
                   </div>
+
+                  {/* حقل كلمة المرور - مطلوب فقط عند الإضافة */}
+                  {!editingDoctor && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        كلمة المرور *
+                      </label>
+                      <input
+                        type="password"
+                        name="password"
+                        required
+                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        value={formData.password || ''}
+                        onChange={handleChange}
+                        placeholder="أدخل كلمة المرور (6 أحرف على الأقل)"
+                        minLength={6}
+                      />
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">

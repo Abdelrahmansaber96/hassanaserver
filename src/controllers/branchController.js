@@ -16,12 +16,10 @@ const getBranches = asyncHandler(async (req, res) => {
 
   const pagination = new Pagination(query, req.query)
     .filter()
-    .search(['name', 'code', 'city', 'address'])
+    .search(['name', 'location', 'city', 'province'])
     .sort()
     .limitFields()
     .paginate();
-
-  pagination.query = pagination.query.populate('manager', 'name email phone');
 
   const result = await pagination.execute();
 
@@ -63,15 +61,7 @@ const getBranch = asyncHandler(async (req, res) => {
 // @route   POST /api/branches
 // @access  Private (Admin only)
 const createBranch = asyncHandler(async (req, res) => {
-  // Check if branch code already exists
-  const existingBranch = await Branch.findOne({ code: req.body.code });
-  if (existingBranch) {
-    return sendError(res, 'Branch with this code already exists', 400);
-  }
-
   const branch = await Branch.create(req.body);
-
-  await branch.populate('manager', 'name email phone');
 
   sendSuccess(res, branch, 'Branch created successfully', 201);
 });
@@ -84,17 +74,6 @@ const updateBranch = asyncHandler(async (req, res) => {
 
   if (!branch) {
     return sendNotFound(res, 'Branch');
-  }
-
-  // Check if code is being changed and if it conflicts
-  if (req.body.code && req.body.code !== branch.code) {
-    const existingBranch = await Branch.findOne({ 
-      code: req.body.code,
-      _id: { $ne: req.params.id }
-    });
-    if (existingBranch) {
-      return sendError(res, 'Branch with this code already exists', 400);
-    }
   }
 
   branch = await Branch.findByIdAndUpdate(

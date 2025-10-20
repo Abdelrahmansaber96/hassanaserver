@@ -7,17 +7,9 @@ const branchSchema = new mongoose.Schema({
     trim: true,
     maxlength: [100, 'Name cannot exceed 100 characters']
   },
-  code: {
+  location: {
     type: String,
-    required: [true, 'Branch code is required'],
-    unique: true,
-    uppercase: true,
-    trim: true,
-    maxlength: [10, 'Code cannot exceed 10 characters']
-  },
-  address: {
-    type: String,
-    required: [true, 'Address is required'],
+    required: [true, 'Location is required'],
     trim: true
   },
   city: {
@@ -25,9 +17,12 @@ const branchSchema = new mongoose.Schema({
     required: [true, 'City is required'],
     trim: true
   },
+  province: {
+    type: String,
+    trim: true
+  },
   phone: {
     type: String,
-    required: [true, 'Phone number is required'],
     trim: true
   },
   email: {
@@ -36,8 +31,8 @@ const branchSchema = new mongoose.Schema({
     match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email']
   },
   manager: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
+    type: String,
+    trim: true
   },
   workingHours: {
     start: {
@@ -50,23 +45,35 @@ const branchSchema = new mongoose.Schema({
     }
   },
   workingDays: [{
+    type: String
+  }],
+  services: [{
     type: String,
-    enum: ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+    trim: true
   }],
   capacity: {
     type: Number,
     default: 50,
     min: 1
   },
-  facilities: [{
+  image: {
+    type: String
+  },
+  rating: {
+    type: Number,
+    min: 0,
+    max: 5,
+    default: 0
+  },
+  description: {
     type: String,
-    trim: true
-  }],
+    maxlength: 500
+  },
   coordinates: {
-    latitude: {
+    lat: {
       type: Number
     },
-    longitude: {
+    lng: {
       type: Number
     }
   },
@@ -87,14 +94,13 @@ const branchSchema = new mongoose.Schema({
 });
 
 // Indexes for performance
-branchSchema.index({ code: 1 });
 branchSchema.index({ city: 1 });
 branchSchema.index({ isActive: 1 });
-branchSchema.index({ 'coordinates.latitude': 1, 'coordinates.longitude': 1 });
+branchSchema.index({ 'coordinates.lat': 1, 'coordinates.lng': 1 });
 
 // Virtual for branch's full address
 branchSchema.virtual('fullAddress').get(function() {
-  return `${this.address}, ${this.city}`;
+  return `${this.location}, ${this.city}`;
 });
 
 // Method to check if branch is open

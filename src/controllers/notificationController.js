@@ -7,14 +7,22 @@ const { Pagination } = require('../utils/pagination');
 // @route   GET /api/notifications
 // @access  Private
 const getNotifications = asyncHandler(async (req, res) => {
-  let query = Notification.find({
-    $or: [
-      { recipients: 'all' },
-      { recipients: req.user.role === 'admin' ? 'admins' : req.user.role === 'doctor' ? 'doctors' : 'staff' },
-      { specificRecipients: req.user.id }
-    ],
-    isActive: true
-  });
+  let query;
+  
+  // إذا كان admin، يستطيع رؤية جميع الإشعارات
+  if (req.user.role === 'admin') {
+    query = Notification.find({ isActive: true });
+  } else {
+    // للمستخدمين الآخرين، فقط الإشعارات الخاصة بهم
+    query = Notification.find({
+      $or: [
+        { recipients: 'all' },
+        { recipients: req.user.role === 'doctor' ? 'doctors' : 'staff' },
+        { specificRecipients: req.user.id }
+      ],
+      isActive: true
+    });
+  }
 
   const pagination = new Pagination(query, req.query)
     .filter()
@@ -39,7 +47,7 @@ const getNotifications = asyncHandler(async (req, res) => {
     }
   );
 
-  sendSuccess(res, result.docs, 'Notifications fetched successfully', 200, { pagination: result.pagination });
+  sendSuccess(res, { notifications: result.docs }, 'Notifications fetched successfully', 200, { pagination: result.pagination });
 });
 
 // @desc    Create new notification
@@ -47,8 +55,21 @@ const getNotifications = asyncHandler(async (req, res) => {
 // @access  Private (Admin only)
 const createNotification = asyncHandler(async (req, res) => {
   req.body.createdBy = req.user.id;
+  
+  // تحديد عدد المستلمين بناءً على نوع المستلمين
+  let recipientsCount = 0;
+  if (req.body.recipients === 'specific' && req.body.specificRecipients) {
+    recipientsCount = req.body.specificRecipients.length;
+  } else if (req.body.recipients === 'all') {
+    // يمكنك حساب عدد جميع المستخدمين/العملاء
+    recipientsCount = 100; // قيمة افتراضية للتوضيح
+  }
 
-  const notification = await Notification.create(req.body);
+  const notification = await Notification.create({
+    ...req.body,
+    recipientsCount,
+    status: req.body.scheduledAt ? 'scheduled' : 'sent' // إذا كان مجدول -> scheduled، وإلا -> sent
+  });
 
   await notification.populate('createdBy', 'name');
 

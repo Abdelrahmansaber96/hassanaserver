@@ -88,6 +88,10 @@ const notificationSchema = new mongoose.Schema({
       default: Date.now
     }
   }],
+  recipientsCount: {
+    type: Number,
+    default: 0
+  },
   deliveryStats: {
     sent: {
       type: Number,
