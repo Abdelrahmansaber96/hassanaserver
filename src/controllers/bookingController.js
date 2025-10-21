@@ -9,22 +9,53 @@ const APIFilters = require('../utils/filters');
 // @route   GET /api/bookings
 // @access  Private
 const getBookings = asyncHandler(async (req, res) => {
-  let query = Booking.find();
+  // Build base filter object
+  const baseFilter = {};
 
-  // Apply role-based filtering
-  if (req.user.role === 'doctor') {
-    query = query.find({ doctor: req.user.id });
+  // Apply role-based filtering FIRST
+  if (req.user.role === 'doctor' && req.user.branch) {
+    // Doctors see all bookings in their branch
+    baseFilter.branch = req.user.branch;
+    console.log('Doctor filter - Branch:', req.user.branch);
   } else if (req.user.role === 'staff' && req.user.branch) {
-    query = query.find({ branch: req.user.branch });
+    baseFilter.branch = req.user.branch;
+    console.log('Staff filter - Branch:', req.user.branch);
   }
 
-  // Apply filters
+  // Apply month/year filtering if provided
+  const { month, year } = req.query;
+  if (month !== undefined && year !== undefined) {
+    const selectedMonth = parseInt(month);
+    const selectedYear = parseInt(year);
+    
+    // Start of the selected month
+    const startDate = new Date(selectedYear, selectedMonth, 1);
+    // End of the selected month
+    const endDate = new Date(selectedYear, selectedMonth + 1, 0, 23, 59, 59);
+    
+    baseFilter.appointmentDate = { $gte: startDate, $lte: endDate };
+    
+    console.log('Date filter applied:', {
+      month: selectedMonth,
+      year: selectedYear,
+      startDate,
+      endDate,
+      userRole: req.user.role,
+      userBranch: req.user.branch
+    });
+  }
+
+  console.log('Final base filter:', baseFilter);
+
+  // Create query with base filter
+  let query = Booking.find(baseFilter);
+
+  // Apply additional filters (status, etc.) without overwriting baseFilter
   const filters = new APIFilters(query, req.query)
     .applyBookingFilters();
 
   // Apply pagination and search
   const pagination = new Pagination(filters.query, req.query)
-    .filter()
     .search(['bookingNumber', 'animal.name'])
     .sort()
     .limitFields()
@@ -47,16 +78,7 @@ const getBookings = asyncHandler(async (req, res) => {
 // @route   GET /api/bookings/:id
 // @access  Private
 const getBooking = asyncHandler(async (req, res) => {
-  let query = Booking.findById(req.params.id);
-
-  // Apply role-based filtering
-  if (req.user.role === 'doctor') {
-    query = query.find({ doctor: req.user.id });
-  } else if (req.user.role === 'staff' && req.user.branch) {
-    query = query.find({ branch: req.user.branch });
-  }
-
-  const booking = await query
+  const booking = await Booking.findById(req.params.id)
     .populate('customer', 'name phone email address city animals')
     .populate('branch', 'name code address city phone')
     .populate('doctor', 'name phone specialization')
@@ -65,6 +87,17 @@ const getBooking = asyncHandler(async (req, res) => {
 
   if (!booking) {
     return sendNotFound(res, 'Booking');
+  }
+
+  // Apply role-based filtering
+  if (req.user.role === 'doctor' && req.user.branch) {
+    if (booking.branch._id.toString() !== req.user.branch.toString()) {
+      return sendError(res, 'Not authorized to view this booking', 403);
+    }
+  } else if (req.user.role === 'staff' && req.user.branch) {
+    if (booking.branch._id.toString() !== req.user.branch.toString()) {
+      return sendError(res, 'Not authorized to view this booking', 403);
+    }
   }
 
   sendSuccess(res, booking, 'Booking details fetched successfully');
@@ -122,13 +155,16 @@ const updateBooking = asyncHandler(async (req, res) => {
   }
 
   // Check permissions
-  if (req.user.role === 'doctor' && booking.doctor.toString() !== req.user.id) {
-    return sendError(res, 'Not authorized to update this booking', 403);
+  if (req.user.role === 'doctor' && req.user.branch) {
+    if (booking.branch.toString() !== req.user.branch.toString()) {
+      return sendError(res, 'Not authorized to update this booking', 403);
+    }
   }
 
-  if (req.user.role === 'staff' && req.user.branch && 
-      booking.branch.toString() !== req.user.branch.toString()) {
-    return sendError(res, 'Not authorized to update this booking', 403);
+  if (req.user.role === 'staff' && req.user.branch) {
+    if (booking.branch.toString() !== req.user.branch.toString()) {
+      return sendError(res, 'Not authorized to update this booking', 403);
+    }
   }
 
   // Check if booking can be updated
@@ -188,8 +224,16 @@ const updateBookingStatus = asyncHandler(async (req, res) => {
   }
 
   // Check permissions
-  if (req.user.role === 'doctor' && booking.doctor.toString() !== req.user.id) {
-    return sendError(res, 'Not authorized to update this booking', 403);
+  if (req.user.role === 'doctor' && req.user.branch) {
+    if (booking.branch.toString() !== req.user.branch.toString()) {
+      return sendError(res, 'Not authorized to update this booking', 403);
+    }
+  }
+
+  if (req.user.role === 'staff' && req.user.branch) {
+    if (booking.branch.toString() !== req.user.branch.toString()) {
+      return sendError(res, 'Not authorized to update this booking', 403);
+    }
   }
 
   // Validate status transitions

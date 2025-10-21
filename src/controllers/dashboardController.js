@@ -11,12 +11,36 @@ const { getDateRange } = require('../utils/helpers');
 // @route   GET /api/dashboard/stats
 // @access  Private
 const getDashboardStats = asyncHandler(async (req, res) => {
-  const { startDate, endDate } = getDateRange('today');
+  const { month, year } = req.query;
+  
+  let startDate, endDate;
+  
+  // If month and year are provided, use them for filtering
+  if (month !== undefined && year !== undefined) {
+    const selectedMonth = parseInt(month);
+    const selectedYear = parseInt(year);
+    
+    // Start of the selected month
+    startDate = new Date(selectedYear, selectedMonth, 1);
+    // End of the selected month
+    endDate = new Date(selectedYear, selectedMonth + 1, 0, 23, 59, 59);
+  } else {
+    // Default to today
+    const todayRange = getDateRange('today');
+    startDate = todayRange.startDate;
+    endDate = todayRange.endDate;
+  }
 
-  // Get today's stats
+  // Build filter based on user role
+  const branchFilter = {};
+  if (req.user.role === 'doctor' && req.user.branch) {
+    branchFilter.branch = req.user.branch;
+  }
+
+  // Get stats for the selected period
   const [
-    todayBookings,
-    todayConsultations,
+    periodBookings,
+    periodConsultations,
     totalCustomers,
     totalBranches,
     totalDoctors,
@@ -25,42 +49,39 @@ const getDashboardStats = asyncHandler(async (req, res) => {
     completedBookings
   ] = await Promise.all([
     Booking.countDocuments({
+      ...branchFilter,
       appointmentDate: { $gte: startDate, $lte: endDate }
     }),
     Consultation.countDocuments({
+      ...branchFilter,
       scheduledDate: { $gte: startDate, $lte: endDate }
     }),
     Customer.countDocuments({ isActive: true }),
     Branch.countDocuments({ isActive: true }),
     User.countDocuments({ role: 'doctor', isActive: true }),
-    Booking.countDocuments({ status: 'pending' }),
-    Booking.countDocuments({ status: 'confirmed' }),
-    Booking.countDocuments({ status: 'completed' })
+    Booking.countDocuments({ 
+      ...branchFilter,
+      appointmentDate: { $gte: startDate, $lte: endDate },
+      status: 'pending' 
+    }),
+    Booking.countDocuments({ 
+      ...branchFilter,
+      appointmentDate: { $gte: startDate, $lte: endDate },
+      status: 'confirmed' 
+    }),
+    Booking.countDocuments({ 
+      ...branchFilter,
+      appointmentDate: { $gte: startDate, $lte: endDate },
+      status: 'completed' 
+    })
   ]);
 
-  // Calculate revenue for today
-  const todayRevenue = await Booking.aggregate([
+  // Calculate revenue for the selected period
+  const periodRevenue = await Booking.aggregate([
     {
       $match: {
+        ...branchFilter,
         appointmentDate: { $gte: startDate, $lte: endDate },
-        status: 'completed',
-        paid: true
-      }
-    },
-    {
-      $group: {
-        _id: null,
-        total: { $sum: '$price' }
-      }
-    }
-  ]);
-
-  // Get monthly stats for comparison
-  const { startDate: monthStart, endDate: monthEnd } = getDateRange('thisMonth');
-  const monthlyRevenue = await Booking.aggregate([
-    {
-      $match: {
-        appointmentDate: { $gte: monthStart, $lte: monthEnd },
         status: 'completed',
         paid: true
       }
@@ -75,31 +96,32 @@ const getDashboardStats = asyncHandler(async (req, res) => {
 
   const stats = {
     quickStats: {
-      todayBookings: todayBookings || 12,
-      todayConsultations: todayConsultations || 8,
-      totalCustomers: totalCustomers || 145,
-      totalBranches: totalBranches || 5,
-      totalDoctors: totalDoctors || 7,
-      pendingBookings: pendingBookings || 6,
-      confirmedBookings: confirmedBookings || 15,
-      completedBookings: completedBookings || 9,
-      todayRevenue: todayRevenue[0]?.total || 2500,
-      monthlyRevenue: monthlyRevenue[0]?.total || 45000
+      todayBookings: periodBookings || 0,
+      todayConsultations: periodConsultations || 0,
+      totalCustomers: totalCustomers || 0,
+      totalBranches: totalBranches || 0,
+      totalDoctors: totalDoctors || 0,
+      pendingBookings: pendingBookings || 0,
+      confirmedBookings: confirmedBookings || 0,
+      completedBookings: completedBookings || 0,
+      todayRevenue: periodRevenue[0]?.total || 0,
+      todayVaccinations: periodBookings || 0, // Same as bookings for vaccinations
+      monthlyRevenue: periodRevenue[0]?.total || 0
     },
     bookingStats: {
-      pending: pendingBookings || 6,
-      confirmed: confirmedBookings || 15,
-      completed: completedBookings || 9,
-      total: (pendingBookings || 6) + (confirmedBookings || 15) + (completedBookings || 9)
+      pending: pendingBookings || 0,
+      confirmed: confirmedBookings || 0,
+      completed: completedBookings || 0,
+      total: (pendingBookings || 0) + (confirmedBookings || 0) + (completedBookings || 0)
     },
     chartData: {
       vaccinationTrends: generateVaccinationTrends(),
       animalDistribution: generateAnimalDistribution(),
       branchUsage: generateBranchUsage(),
       bookingStatus: {
-        confirmed: confirmedBookings || 15,
-        pending: pendingBookings || 6,
-        cancelled: Math.floor(Math.random() * 5) + 2
+        confirmed: confirmedBookings || 0,
+        pending: pendingBookings || 0,
+        cancelled: 0
       }
     }
   };
@@ -506,38 +528,63 @@ const getAllChartsData = asyncHandler(async (req, res) => {
 // @access  Private
 const getOperationsChartData = asyncHandler(async (req, res) => {
   try {
-    const { period = '7days' } = req.query;
+    const { period = '7days', month, year } = req.query;
     
-    let startDate, groupBy, dateFormat;
+    let startDate, endDate, groupBy, dateFormat;
     const currentDate = new Date();
     
-    switch (period) {
-      case '7days':
-        startDate = new Date(currentDate.getTime() - 7 * 24 * 60 * 60 * 1000);
-        groupBy = { $dateToString: { format: "%Y-%m-%d", date: "$appointmentDate" } };
-        dateFormat = 'daily';
-        break;
-      case '30days':
-        startDate = new Date(currentDate.getTime() - 30 * 24 * 60 * 60 * 1000);
-        groupBy = { $dateToString: { format: "%Y-%m-%d", date: "$appointmentDate" } };
-        dateFormat = 'daily';
-        break;
-      case '6months':
-        startDate = new Date(currentDate.getTime() - 6 * 30 * 24 * 60 * 60 * 1000);
-        groupBy = { $dateToString: { format: "%Y-%m", date: "$appointmentDate" } };
-        dateFormat = 'monthly';
-        break;
-      default:
-        startDate = new Date(currentDate.getTime() - 7 * 24 * 60 * 60 * 1000);
-        groupBy = { $dateToString: { format: "%Y-%m-%d", date: "$appointmentDate" } };
-        dateFormat = 'daily';
+    // Build filter based on user role
+    const matchFilter = {};
+    if (req.user.role === 'doctor' && req.user.branch) {
+      matchFilter.branch = req.user.branch;
     }
+    
+    // If month and year are provided, use them for filtering
+    if (month !== undefined && year !== undefined) {
+      const selectedMonth = parseInt(month);
+      const selectedYear = parseInt(year);
+      
+      // Start of the selected month
+      startDate = new Date(selectedYear, selectedMonth, 1);
+      // End of the selected month
+      endDate = new Date(selectedYear, selectedMonth + 1, 0, 23, 59, 59);
+      
+      groupBy = { $dateToString: { format: "%Y-%m-%d", date: "$appointmentDate" } };
+      dateFormat = 'monthly';
+    } else {
+      // Use period-based filtering (existing logic)
+      switch (period) {
+        case '7days':
+          startDate = new Date(currentDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+          endDate = currentDate;
+          groupBy = { $dateToString: { format: "%Y-%m-%d", date: "$appointmentDate" } };
+          dateFormat = 'daily';
+          break;
+        case '30days':
+          startDate = new Date(currentDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+          endDate = currentDate;
+          groupBy = { $dateToString: { format: "%Y-%m-%d", date: "$appointmentDate" } };
+          dateFormat = 'daily';
+          break;
+        case '6months':
+          startDate = new Date(currentDate.getTime() - 6 * 30 * 24 * 60 * 60 * 1000);
+          endDate = currentDate;
+          groupBy = { $dateToString: { format: "%Y-%m", date: "$appointmentDate" } };
+          dateFormat = 'monthly_range';
+          break;
+        default:
+          startDate = new Date(currentDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+          endDate = currentDate;
+          groupBy = { $dateToString: { format: "%Y-%m-%d", date: "$appointmentDate" } };
+          dateFormat = 'daily';
+      }
+    }
+
+    matchFilter.appointmentDate = { $gte: startDate, $lte: endDate };
 
     const operationsData = await Booking.aggregate([
       {
-        $match: {
-          appointmentDate: { $gte: startDate, $lte: currentDate }
-        }
+        $match: matchFilter
       },
       {
         $group: {
@@ -554,10 +601,22 @@ const getOperationsChartData = asyncHandler(async (req, res) => {
     const labels = [];
     const data = [];
     
-    if (dateFormat === 'daily') {
+    if (dateFormat === 'monthly') {
+      // For monthly view (when month/year provided), show all days in that month
+      const daysInMonth = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0).getDate();
+      
+      for (let day = 1; day <= daysInMonth; day++) {
+        const date = new Date(startDate.getFullYear(), startDate.getMonth(), day);
+        const dateStr = date.toISOString().split('T')[0];
+        const found = operationsData.find(item => item._id === dateStr);
+        
+        labels.push(date.toLocaleDateString('ar-SA', { day: 'numeric' }));
+        data.push(found ? found.count : 0);
+      }
+    } else if (dateFormat === 'daily') {
       const days = period === '7days' ? 7 : 30;
       for (let i = days - 1; i >= 0; i--) {
-        const date = new Date(currentDate.getTime() - i * 24 * 60 * 60 * 1000);
+        const date = new Date(endDate.getTime() - i * 24 * 60 * 60 * 1000);
         const dateStr = date.toISOString().split('T')[0];
         const found = operationsData.find(item => item._id === dateStr);
         
@@ -566,7 +625,7 @@ const getOperationsChartData = asyncHandler(async (req, res) => {
       }
     } else {
       for (let i = 5; i >= 0; i--) {
-        const date = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
+        const date = new Date(endDate.getFullYear(), endDate.getMonth() - i, 1);
         const dateStr = date.toISOString().substr(0, 7);
         const found = operationsData.find(item => item._id === dateStr);
         
@@ -590,12 +649,19 @@ const getOperationsChartData = asyncHandler(async (req, res) => {
 // @access  Private
 const getRevenueChartData = asyncHandler(async (req, res) => {
   try {
+    // Build filter based on user role
+    const matchFilter = {
+      status: 'completed',
+      paid: true
+    };
+    
+    if (req.user.role === 'doctor' && req.user.branch) {
+      matchFilter.branch = req.user.branch;
+    }
+
     const revenueData = await Booking.aggregate([
       {
-        $match: {
-          status: 'completed',
-          paid: true
-        }
+        $match: matchFilter
       },
       {
         $lookup: {
@@ -648,7 +714,16 @@ const getRevenueChartData = asyncHandler(async (req, res) => {
 // @access  Private
 const getOperationsDistributionData = asyncHandler(async (req, res) => {
   try {
+    // Build filter based on user role
+    const matchFilter = {};
+    if (req.user.role === 'doctor' && req.user.branch) {
+      matchFilter.branch = req.user.branch;
+    }
+
     const distributionData = await Booking.aggregate([
+      {
+        $match: matchFilter
+      },
       {
         $lookup: {
           from: 'customers',
@@ -719,12 +794,19 @@ const getTransactionsChartData = asyncHandler(async (req, res) => {
         groupBy = { $dateToString: { format: "%Y-%m-%d", date: "$appointmentDate" } };
     }
 
+    // Build filter based on user role
+    const matchFilter = {
+      appointmentDate: { $gte: startDate, $lte: currentDate },
+      paid: true
+    };
+    
+    if (req.user.role === 'doctor' && req.user.branch) {
+      matchFilter.branch = req.user.branch;
+    }
+
     const transactionsData = await Booking.aggregate([
       {
-        $match: {
-          appointmentDate: { $gte: startDate, $lte: currentDate },
-          paid: true
-        }
+        $match: matchFilter
       },
       {
         $group: {

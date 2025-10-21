@@ -4,7 +4,22 @@ const { asyncHandler } = require('../utils/AppError');
 const { sendSuccess, sendError, sendNotFound } = require('../utils/helpers');
 
 const getCustomers = asyncHandler(async (req, res) => {
-  const customers = await Customer.find();
+  let customers;
+  
+  // If user is a doctor, get only customers who have bookings in their branch
+  if (req.user.role === 'doctor' && req.user.branch) {
+    // Get all bookings in the doctor's branch
+    const bookingsInBranch = await Booking.find({ branch: req.user.branch }).distinct('customer');
+    
+    // Get customers who have bookings in this branch
+    customers = await Customer.find({
+      _id: { $in: bookingsInBranch }
+    });
+  } else {
+    // Admin and other roles see all customers
+    customers = await Customer.find();
+  }
+  
   sendSuccess(res, customers, 'Customers fetched successfully');
 });
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Phone, MessageCircle, CreditCard, Users, Sheet, List, BarChart } from 'lucide-react';
 
-const StatsCards = () => {
+const StatsCards = ({ selectedDate }) => {
   const [stats, setStats] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -27,11 +27,22 @@ const StatsCards = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await authorizedFetch('/api/dashboard/stats');
+        // Extract month and year from selectedDate
+        const month = selectedDate.getMonth(); // 0-11
+        const year = selectedDate.getFullYear();
+        
+        const response = await authorizedFetch(`/api/dashboard/stats?month=${month}&year=${year}`);
         if (response.ok) {
           const data = await response.json();
           const quickStats = data.data.quickStats;
 
+          // Get month name in Arabic
+          const monthsAr = [
+            'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+            'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+          ];
+          const monthName = monthsAr[selectedDate.getMonth()];
+          
           const statsData = [
             {
               id: 1,
@@ -44,7 +55,7 @@ const StatsCards = () => {
             },
             {
               id: 2,
-              title: 'حجوزات اليوم',
+              title: `حجوزات ${monthName}`,
               value: quickStats.todayBookings?.toLocaleString('ar-SA') || '0',
               change: '+8%',
               changeType: 'increase',
@@ -53,7 +64,7 @@ const StatsCards = () => {
             },
             {
               id: 3,
-              title: 'استشارات اليوم',
+              title: `استشارات ${monthName}`,
               value: quickStats.todayConsultations?.toLocaleString('ar-SA') || '0',
               change: '+15%',
               changeType: 'increase',
@@ -62,7 +73,16 @@ const StatsCards = () => {
             },
             {
               id: 4,
-              title: 'إيرادات اليوم',
+              title: `تطعيمات ${monthName}`,
+              value: quickStats.todayVaccinations?.toLocaleString('ar-SA') || '0',
+              change: '+15%',
+              changeType: 'increase',
+              icon: BarChart,
+              color: 'red',
+            },
+            {
+              id: 5,
+              title: `إيرادات ${monthName}`,
               value: `${quickStats.todayRevenue?.toLocaleString('ar-SA') || '0'} ريال`,
               change: '+5%',
               changeType: 'increase',
@@ -80,7 +100,7 @@ const StatsCards = () => {
     };
 
     fetchStats();
-  }, []);
+  }, [selectedDate]);
 
   const getColorClasses = (color) => {
     const colors = {
@@ -114,7 +134,7 @@ const StatsCards = () => {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
       {stats.map((stat, index) => {
         const Icon = stat.icon;
 

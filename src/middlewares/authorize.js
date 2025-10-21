@@ -154,7 +154,7 @@ const checkActionPermission = (action, resourceType) => {
       },
       doctor: {
         customer: ['read'],
-        booking: ['read', 'update'],
+        booking: ['create', 'read', 'update', 'delete'],
         consultation: ['create', 'read', 'update'],
         offer: ['read'],
         notification: ['read'],

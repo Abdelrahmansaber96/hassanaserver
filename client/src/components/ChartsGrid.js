@@ -6,7 +6,7 @@ import RevenueChart from './charts/RevenueChart';
 import TransactionsChart from './charts/TransactionsChart';
 import { RefreshCcw, TrendingUp } from 'lucide-react';
 
-const ChartsGrid = () => {
+const ChartsGrid = ({ selectedDate }) => {
   const [chartsData, setChartsData] = useState({
     operations: null,
     revenue: null,
@@ -36,8 +36,12 @@ const ChartsGrid = () => {
 
   const fetchChartsData = async () => {
     try {
+      // Extract month and year from selectedDate
+      const month = selectedDate.getMonth(); // 0-11
+      const year = selectedDate.getFullYear();
+      
       const [operationsRes, revenueRes, distributionRes, transactionsRes] = await Promise.all([
-        authorizedFetch('/api/dashboard/charts/operations?period=7days'),
+        authorizedFetch(`/api/dashboard/charts/operations?month=${month}&year=${year}`),
         authorizedFetch('/api/dashboard/charts/revenue'),
         authorizedFetch('/api/dashboard/charts/operations-distribution'),
         authorizedFetch('/api/dashboard/charts/transactions?period=7days')
@@ -64,7 +68,7 @@ const ChartsGrid = () => {
 
   useEffect(() => {
     fetchChartsData();
-  }, []);
+  }, [selectedDate]);
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -72,6 +76,15 @@ const ChartsGrid = () => {
   };
 
   const totalVaccinations = chartsData?.distribution?.reduce((sum, item) => sum + item.value, 0) || 0;
+  
+  // Get month name in Arabic
+  const getMonthName = () => {
+    const monthsAr = [
+      'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+      'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+    ];
+    return monthsAr[selectedDate.getMonth()];
+  };
 
   if (loading) {
     return (
@@ -99,14 +112,14 @@ const ChartsGrid = () => {
       >
         <div className="mb-4 flex items-start justify-between gap-4" dir="rtl">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">إجمالي الحجوزات</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">إجمالي التطعيمات الكلي </h3>
             <div className="flex items-center gap-4 text-sm">
              <div className="text-right">
             <div className='flex justify-center items-center'>
               <div className="text-3xl font-extrabold text-emerald-600 me-4">
                 {chartsData?.operations?.data?.reduce((sum, val) => sum + val, 0) || 0}
               </div>
-              <div className="text-xs text-gray-500 mb-1">حجز هذا الأسبوع</div>
+              <div className="text-xs text-gray-500 mb-1">حجز شهر {getMonthName()}</div>
             </div>
           </div>
             </div>

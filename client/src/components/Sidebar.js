@@ -31,7 +31,6 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
     { id: 'branches', label: 'إدارة الفروع', icon: MapPin, path: '/branches' },
     { id: 'doctors', label: 'إدارة الأطباء', icon: Stethoscope, path: '/doctors' },
     { id: 'consultations', label: 'الاستشارات', icon: Phone, path: '/consultations' },
-    { id: 'offers', label: 'العروض', icon: Gift, path: '/offers' },
     { id: 'notifications', label: 'الإشعارات', icon: Bell, path: '/notifications' },
     { id: 'settings', label: 'الإعدادات', icon: Settings, path: '/settings' },
   ];
@@ -81,7 +80,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
           </button>
         </div>
           <div className="p-4 flex items-center justify-center gap-2">
-            <img src={logo} alt="Logo" className="h-12" />
+            <img src={logo} alt="Logo" className="h-`11`" />
             <h2 className="text-lg blue-500 text-4xl text-blue-600 font-bold text-center">حصانة</h2>
           </div>
         {/* Navigation */}

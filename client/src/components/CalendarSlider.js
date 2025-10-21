@@ -115,30 +115,6 @@ const CalendarSlider = ({
       </div>
 
       {/* Optional prev/next subtle controls (hidden on small if not needed) */}
-      <div className="absolute -right-9 top-1/2 -translate-y-1/2 hidden sm:flex gap-2">
-        <button
-          type="button"
-          onClick={goNext}
-          disabled={!canNext}
-          className={`p-1.5 rounded-lg border text-[#1F2757] bg-white shadow-sm ${
-            canNext ? 'hover:bg-gray-50' : 'opacity-40 cursor-not-allowed'
-          }`}
-          aria-label="الشهر التالي"
-        >
-          <ChevronLeft size={16} />
-        </button>
-        <button
-          type="button"
-          onClick={goPrev}
-          disabled={!canPrev}
-          className={`p-1.5 rounded-lg border text-[#1F2757] bg-white shadow-sm ${
-            canPrev ? 'hover:bg-gray-50' : 'opacity-40 cursor-not-allowed'
-          }`}
-          aria-label="الشهر السابق"
-        >
-          <ChevronRight size={16} />
-        </button>
-      </div>
 
       {/* Dropdown panel */}
       <AnimatePresence>
@@ -148,7 +124,7 @@ const CalendarSlider = ({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
             transition={{ duration: 0.18 }}
-            className="absolute z-30 mt-2 right-0 w-64 bg-white border border-gray-200 rounded-2xl shadow-lg p-3"
+            className="absolute top-9 z-30   w-64 bg-white border border-gray-200 rounded-2xl shadow-lg p-3"
           >
             {/* Year header with nav */}
             <div className="flex items-center justify-between mb-2">

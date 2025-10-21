@@ -1,7 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Search, Edit, Trash2, Calendar, Clock, User, MapPin, File ,CircleCheckBig, Bell, X} from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Plus, Search, Edit, Trash2, Calendar, Clock, User, File ,CircleCheckBig, Bell, X} from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import CalendarSlider from '../components/CalendarSlider';
 
 const Bookings = () => {
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [showAllBookings, setShowAllBookings] = useState(false); // زر لعرض كل الحجوزات
   const [bookings, setBookings] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [vaccinations, setVaccinations] = useState([]);
@@ -43,10 +47,22 @@ const Bookings = () => {
   };
 
   // جلب البيانات من API
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
+      let bookingsEndpoint = '/api/bookings';
+      
+      // إذا لم نكن في وضع "عرض الكل"، أضف تصفية الشهر
+      if (!showAllBookings) {
+        const month = selectedDate.getMonth(); // 0-11
+        const year = selectedDate.getFullYear();
+        bookingsEndpoint = `/api/bookings?month=${month}&year=${year}`;
+        console.log('Fetching bookings for:', { month, year, selectedDate });
+      } else {
+        console.log('Fetching all bookings (no date filter)');
+      }
+      
       const [bookingsRes, customersRes, vaccinationsRes, branchesRes] = await Promise.all([
-        authorizedFetch('/api/bookings'),
+        authorizedFetch(bookingsEndpoint),
         authorizedFetch('/api/customers'),
         authorizedFetch('/api/vaccinations'),
         authorizedFetch('/api/branches')
@@ -54,7 +70,22 @@ const Bookings = () => {
 
       if (bookingsRes.ok) {
         const bookingsData = await bookingsRes.json();
-        setBookings(bookingsData.data.bookings || []);
+        console.log('✅ Bookings API Response:', bookingsData);
+        console.log('📊 Bookings array:', bookingsData.data?.bookings);
+        console.log('🔢 Number of bookings:', bookingsData.data?.bookings?.length || 0);
+        
+        const bookingsList = bookingsData.data?.bookings || [];
+        console.log('💾 Setting bookings state with:', bookingsList.length, 'items');
+        setBookings(bookingsList);
+        
+        // Force re-render after a moment to ensure state is updated
+        setTimeout(() => {
+          console.log('🔄 Current bookings state:', bookingsList.length);
+        }, 100);
+      } else {
+        console.error('❌ Failed to fetch bookings:', bookingsRes.status);
+        const errorData = await bookingsRes.json();
+        console.error('Error details:', errorData);
       }
 
       if (customersRes.ok) {
@@ -83,11 +114,11 @@ const Bookings = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedDate, showAllBookings]); // Dependencies
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]); // استخدام fetchData كـ dependency
 
   // تصفية الحجوزات
   const filteredBookings = bookings.filter(booking => {
@@ -100,6 +131,13 @@ const Bookings = () => {
     const matchesStatus = statusFilter === 'all' || booking.status === statusFilter;
 
     return matchesSearch && matchesStatus;
+  });
+
+  console.log('🔍 Filter status:', {
+    totalBookings: bookings.length,
+    filteredBookings: filteredBookings.length,
+    searchTerm,
+    statusFilter
   });
 
   // فتح نموذج إضافة/تعديل
@@ -221,29 +259,6 @@ const Bookings = () => {
     }
   };
 
-  // تحديث حالة الحجز
-  const updateBookingStatus = async (bookingId, newStatus) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/bookings/${bookingId}/status`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ status: newStatus })
-      });
-
-      if (response.ok) {
-        fetchData();
-        alert('تم تحديث حالة الحجز بنجاح');
-      }
-    } catch (error) {
-      console.error('Error updating booking status:', error);
-      alert('حدث خطأ أثناء تحديث الحالة');
-    }
-  };
-
   // حذف الحجز
   const handleDelete = async (bookingId) => {
     if (!window.confirm('هل أنت متأكد من حذف هذا الحجز؟')) return;
@@ -264,6 +279,36 @@ const Bookings = () => {
     } catch (error) {
       console.error('Error deleting booking:', error);
       alert('حدث خطأ أثناء الحذف');
+    }
+  };
+
+  // تحديث حالة الحجز
+  const handleStatusUpdate = async (bookingId, newStatus) => {
+    try {
+      const response = await authorizedFetch(`/api/bookings/${bookingId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      if (response.ok) {
+        fetchData();
+        const statusText = {
+          'pending': 'في الانتظار',
+          'confirmed': 'مؤكد',
+          'completed': 'مكتمل',
+          'cancelled': 'ملغى'
+        };
+        alert(`تم تحديث حالة الحجز إلى: ${statusText[newStatus]}`);
+      } else {
+        const error = await response.json();
+        alert(error.message || 'حدث خطأ أثناء التحديث');
+      }
+    } catch (error) {
+      console.error('Error updating status:', error);
+      alert('حدث خطأ أثناء تحديث الحالة');
     }
   };
 
@@ -298,6 +343,10 @@ const Bookings = () => {
         [name]: value
       });
     }
+  };
+
+    const handleDateChange = (newDate) => {
+    setSelectedDate(newDate);
   };
 
   // دالة لتحديد لون الحالة
@@ -338,17 +387,27 @@ const Bookings = () => {
           <h1 className="text-2xl font-bold text-gray-900">إدارة الحجوزات</h1>
           <p className="text-gray-600">إدارة جميع حجوزات التطعيمات</p>
         </div>
-        <button
+        
+       <div className='flex me-2 gap-5'>
+         <CalendarSlider 
+            className="w-auto" 
+            value={selectedDate}
+            onChange={handleDateChange}
+          /> 
+         <button
           onClick={() => openModal()}
           className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
         >
+          
           <Plus className="h-5 w-5" />
           حجز جديد
         </button>
+       </div>
+        
       </div>
 
       {/* Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="relative">
           <Search className="absolute right-3 top-3 h-5 w-5 text-gray-400" />
           <input
@@ -371,6 +430,17 @@ const Bookings = () => {
           <option value="completed">مكتمل</option>
           <option value="cancelled">ملغي</option>
         </select>
+        
+        <button
+          onClick={() => setShowAllBookings(!showAllBookings)}
+          className={`px-4 py-2 rounded-lg border transition-colors ${
+            showAllBookings 
+              ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700' 
+              : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+          }`}
+        >
+          {showAllBookings ? '📅 عرض حجوزات الشهر' : '📋 عرض كل الحجوزات'}
+        </button>
       </div>
 
       {/* Stats Cards */}
@@ -508,28 +578,23 @@ const Bookings = () => {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
-                      {booking.status === 'pending' && (
-                        <button
-                          onClick={() => updateBookingStatus(booking._id, 'confirmed')}
-                          className="text-green-600 hover:text-green-900"
-                          title="تأكيد الحجز"
-                        >
-                          ✓
-                        </button>
-                      )}
-                      {booking.status === 'confirmed' && (
-                        <button
-                          onClick={() => updateBookingStatus(booking._id, 'completed')}
-                          className="text-blue-600 hover:text-blue-900"
-                          title="إكمال الحجز"
-                        >
-                          ✓✓
-                        </button>
-                      )}
+                    <div className="flex space-x-2 gap-2">
+                      {/* Dropdown لتغيير الحالة */}
+                      <select
+                        value={booking.status}
+                        onChange={(e) => handleStatusUpdate(booking._id, e.target.value)}
+                        className="text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="pending">في الانتظار</option>
+                        <option value="confirmed">مؤكد</option>
+                        <option value="completed">مكتمل</option>
+                        <option value="cancelled">ملغى</option>
+                      </select>
+                      
                       <button
                         onClick={() => openModal(booking)}
                         className="text-blue-600 hover:text-blue-900"
+                        title="تعديل"
                       >
                         <Edit className="h-4 w-4" />
                       </button>
