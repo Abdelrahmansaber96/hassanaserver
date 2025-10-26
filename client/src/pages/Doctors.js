@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 const Doctors = () => {
   const { user } = useAuth();
   const [doctors, setDoctors] = useState([]);
+  const [branches, setBranches] = useState([]); // إضافة state للفروع
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -87,8 +88,22 @@ const Doctors = () => {
     }
   };
 
+  // جلب الفروع من API
+  const fetchBranches = async () => {
+    try {
+      const response = await authorizedFetch('/api/branches');
+      if (response.ok) {
+        const result = await response.json();
+        setBranches(result.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching branches:', error);
+    }
+  };
+
   useEffect(() => {
     fetchDoctors();
+    fetchBranches(); // جلب الفروع عند تحميل الصفحة
   }, []);
 
   // تصفية الأطباء
@@ -204,9 +219,10 @@ const Doctors = () => {
         delete doctorData.password;
       }
       
-      // إزالة branch إذا كان فارغاً
+      // التحقق من أن الفرع محدد (مطلوب للطبيب)
       if (!doctorData.branch || doctorData.branch === '') {
-        delete doctorData.branch;
+        alert('الرجاء اختيار الفرع الذي يعمل به الطبيب');
+        return;
       }
       
       // إزالة image إذا كان فارغاً
@@ -650,6 +666,29 @@ const Doctors = () => {
                       <option value="طب الخيول">طب الخيول</option>
                       <option value="التطعيمات والوقاية">التطعيمات والوقاية</option>
                     </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      الفرع *
+                    </label>
+                    <select
+                      name="branch"
+                      required
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      value={formData.branch}
+                      onChange={handleChange}
+                    >
+                      <option value="">اختر الفرع</option>
+                      {branches.map(branch => (
+                        <option key={branch._id} value={branch._id}>
+                          {branch.name} - {branch.city}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      ⚠️ مطلوب: الطبيب يجب أن يكون مسجلاً في فرع محدد
+                    </p>
                   </div>
 
                   <div>

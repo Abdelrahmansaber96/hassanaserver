@@ -27,8 +27,16 @@ const getDoctors = asyncHandler(async (req, res) => {
 // @route   GET /api/doctors/:id
 // @access  Private
 const getDoctor = asyncHandler(async (req, res) => {
-  const doctor = await User.findOne({ _id: req.params.id, role: 'doctor' })
+  let doctorQuery = User.findOne({ _id: req.params.id, role: 'doctor' })
     .populate('branch', 'name code city address');
+
+  // إذا كان المستخدم أدمن، أضف التقييمات
+  if (req.user.role === 'admin') {
+    doctorQuery = doctorQuery.populate('reviews.customer', 'name phone');
+    doctorQuery = doctorQuery.populate('reviews.consultation', 'consultationNumber');
+  }
+
+  const doctor = await doctorQuery;
 
   if (!doctor) {
     return sendNotFound(res, 'Doctor');
@@ -50,12 +58,20 @@ const getDoctor = asyncHandler(async (req, res) => {
     })
   ]);
 
+  // إزالة التقييمات إذا لم يكن المستخدم أدمن
+  let doctorData = doctor.toObject();
+  if (req.user.role !== 'admin') {
+    delete doctorData.reviews;
+  }
+
   sendSuccess(res, {
-    doctor,
+    doctor: doctorData,
     stats: {
       totalBookings,
       totalConsultations,
-      todayBookings
+      todayBookings,
+      rating: doctor.rating,
+      totalReviews: doctor.totalReviews
     }
   }, 'Doctor details fetched successfully');
 });

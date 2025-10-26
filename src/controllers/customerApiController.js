@@ -2,16 +2,207 @@ const Customer = require('../models/Customer');
 const { asyncHandler } = require('../utils/AppError');
 const { sendSuccess, sendError, sendNotFound } = require('../utils/helpers');
 
-// @desc    Add animal by customer (with JWT)
-// @route   POST /api/customer/animals
-// @access  Private (Customer JWT)
-const addAnimal = asyncHandler(async (req, res) => {
-  const { name, type, age, weight, breed, notes } = req.body;
+// @desc    Register new customer (Simple - No Password)
+// @route   POST /api/customer-api/register
+// @access  Public
+const registerCustomer = asyncHandler(async (req, res) => {
+  const { name, phone } = req.body;
 
-  // Get customer from JWT token
-  const customer = await Customer.findById(req.customer.id);
+  // Validate required fields
+  if (!name || !phone) {
+    return sendError(res, 'Name and phone are required', 400);
+  }
+
+  // Validate phone format (Saudi numbers)
+  const phoneRegex = /^(05|5|\+9665|9665)[0-9]{8}$/;
+  const cleanPhone = phone.replace(/\s+/g, '');
+  
+  if (!phoneRegex.test(cleanPhone)) {
+    return sendError(res, 'Invalid phone number format. Use Saudi format: 05xxxxxxxx', 400);
+  }
+
+  // Normalize phone number (remove +966 or 966, keep 05xxxxxxxx format)
+  let normalizedPhone = cleanPhone;
+  if (cleanPhone.startsWith('+966')) {
+    normalizedPhone = '0' + cleanPhone.substring(4);
+  } else if (cleanPhone.startsWith('966')) {
+    normalizedPhone = '0' + cleanPhone.substring(3);
+  } else if (cleanPhone.startsWith('5')) {
+    normalizedPhone = '0' + cleanPhone;
+  }
+
+  // Check if customer already exists
+  const existingCustomer = await Customer.findOne({ phone: normalizedPhone });
+  if (existingCustomer) {
+    return sendError(res, 'هذا الرقم مسجل مسبقاً. يرجى استخدام رقم آخر أو تسجيل الدخول.', 400);
+  }
+
+  try {
+    // Create new customer (without password)
+    const customer = await Customer.create({
+      name,
+      phone: normalizedPhone,
+      isActive: true
+    });
+
+    sendSuccess(res, {
+      customer: {
+        id: customer._id,
+        name: customer.name,
+        phone: customer.phone,
+        city: customer.city,
+        address: customer.address,
+        email: customer.email,
+        animals: customer.animals
+      }
+    }, 'تم التسجيل بنجاح', 201);
+  } catch (error) {
+    // Handle MongoDB duplicate key error
+    if (error.code === 11000) {
+      return sendError(res, 'هذا الرقم مسجل مسبقاً. يرجى استخدام رقم آخر أو تسجيل الدخول.', 400);
+    }
+    throw error; // Re-throw other errors to be handled by asyncHandler
+  }
+});
+
+// @desc    Login customer (Simple - Phone Only)
+// @route   POST /api/customer-api/login
+// @access  Public
+const loginCustomer = asyncHandler(async (req, res) => {
+  const { phone } = req.body;
+
+  // Validate phone
+  if (!phone) {
+    return sendError(res, 'Phone number is required', 400);
+  }
+
+  // Normalize phone number
+  const phoneRegex = /^(05|5|\+9665|9665)[0-9]{8}$/;
+  const cleanPhone = phone.replace(/\s+/g, '');
+  
+  if (!phoneRegex.test(cleanPhone)) {
+    return sendError(res, 'Invalid phone number format', 400);
+  }
+
+  let normalizedPhone = cleanPhone;
+  if (cleanPhone.startsWith('+966')) {
+    normalizedPhone = '0' + cleanPhone.substring(4);
+  } else if (cleanPhone.startsWith('966')) {
+    normalizedPhone = '0' + cleanPhone.substring(3);
+  } else if (cleanPhone.startsWith('5')) {
+    normalizedPhone = '0' + cleanPhone;
+  }
+
+  // Find customer
+  const customer = await Customer.findOne({ phone: normalizedPhone });
+  
+  if (!customer) {
+    return sendError(res, 'Customer not found. Please register first.', 404);
+  }
+
+  if (!customer.isActive) {
+    return sendError(res, 'Customer account is deactivated', 403);
+  }
+
+  // Update last login
+  customer.lastLogin = new Date();
+  await customer.save();
+
+  sendSuccess(res, {
+    customer: {
+      id: customer._id,
+      name: customer.name,
+      phone: customer.phone,
+      city: customer.city,
+      address: customer.address,
+      email: customer.email,
+      animals: customer.animals.filter(a => a.isActive),
+      totalBookings: customer.totalBookings || 0,
+      lastBookingDate: customer.lastBookingDate
+    }
+  }, 'Login successful');
+});
+
+// @desc    Get customer profile by ID (No Auth Required)
+// @route   GET /api/customer-api/profile/:customerId
+// @access  Public
+const getCustomerProfile = asyncHandler(async (req, res) => {
+  const { customerId } = req.params;
+
+  const customer = await Customer.findById(customerId);
+  
   if (!customer) {
     return sendError(res, 'Customer not found', 404);
+  }
+
+  if (!customer.isActive) {
+    return sendError(res, 'Customer account is deactivated', 403);
+  }
+
+  sendSuccess(res, {
+    customer: {
+      id: customer._id,
+      name: customer.name,
+      phone: customer.phone,
+      city: customer.city,
+      address: customer.address,
+      email: customer.email,
+      animals: customer.animals.filter(a => a.isActive),
+      totalBookings: customer.totalBookings || 0,
+      lastBookingDate: customer.lastBookingDate
+    }
+  });
+});
+
+// @desc    Update customer profile (No Auth Required - using customer ID)
+// @route   PUT /api/customer-api/profile/:customerId
+// @access  Public
+const updateCustomerProfile = asyncHandler(async (req, res) => {
+  const { customerId } = req.params;
+  const { name, email, city, address } = req.body;
+
+  const customer = await Customer.findById(customerId);
+  
+  if (!customer) {
+    return sendError(res, 'Customer not found', 404);
+  }
+
+  // Update fields
+  if (name) customer.name = name;
+  if (email) customer.email = email;
+  if (city) customer.city = city;
+  if (address) customer.address = address;
+
+  await customer.save();
+
+  sendSuccess(res, {
+    customer: {
+      id: customer._id,
+      name: customer.name,
+      phone: customer.phone,
+      city: customer.city,
+      address: customer.address,
+      email: customer.email
+    }
+  }, 'Profile updated successfully');
+});
+
+// @desc    Add animal by customer (No Auth Required - using customer ID)
+// @route   POST /api/customer-api/:customerId/animals
+// @access  Public
+const addAnimal = asyncHandler(async (req, res) => {
+  const { customerId } = req.params;
+  const { name, type, count, age, weight, breed, notes } = req.body;
+
+  // Get customer by ID
+  const customer = await Customer.findById(customerId);
+  if (!customer) {
+    return sendError(res, 'Customer not found', 404);
+  }
+
+  // Validate count
+  if (!count || count < 1) {
+    return sendError(res, 'Count must be at least 1', 400);
   }
 
   // Check if animal name already exists for this customer
@@ -20,13 +211,14 @@ const addAnimal = asyncHandler(async (req, res) => {
   );
   
   if (existingAnimal) {
-    return sendError(res, 'Animal with this name already exists for this customer');
+    return sendError(res, 'Animal with this name already exists for this customer', 400);
   }
 
   // Add new animal
   const newAnimal = {
     name,
     type,
+    count: count || 1,
     age: age || 0,
     weight: weight || 0,
     breed: breed || '',
@@ -49,12 +241,14 @@ const addAnimal = asyncHandler(async (req, res) => {
   }, 'Animal added successfully', 201);
 });
 
-// @desc    Get customer animals (with JWT)
-// @route   GET /api/customer/animals
-// @access  Private (Customer JWT)
+// @desc    Get customer animals (No Auth Required)
+// @route   GET /api/customer-api/:customerId/animals
+// @access  Public
 const getMyAnimals = asyncHandler(async (req, res) => {
-  // Get customer from JWT token
-  const customer = await Customer.findById(req.customer.id);
+  const { customerId } = req.params;
+  
+  // Get customer by ID
+  const customer = await Customer.findById(customerId);
   if (!customer) {
     return sendError(res, 'Customer not found', 404);
   }
@@ -73,15 +267,15 @@ const getMyAnimals = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Update animal (with JWT)
-// @route   PUT /api/customer/animals/:animalId
-// @access  Private (Customer JWT)
+// @desc    Update animal (No Auth Required)
+// @route   PUT /api/customer-api/:customerId/animals/:animalId
+// @access  Public
 const updateAnimal = asyncHandler(async (req, res) => {
-  const { animalId } = req.params;
-  const { name, type, age, weight, breed, notes } = req.body;
+  const { customerId, animalId } = req.params;
+  const { name, type, count, age, weight, breed, notes } = req.body;
 
-  // Get customer from JWT token
-  const customer = await Customer.findById(req.customer.id);
+  // Get customer by ID
+  const customer = await Customer.findById(customerId);
   if (!customer) {
     return sendError(res, 'Customer not found', 404);
   }
@@ -101,13 +295,19 @@ const updateAnimal = asyncHandler(async (req, res) => {
     );
     
     if (existingAnimal) {
-      return sendError(res, 'Animal with this name already exists for this customer');
+      return sendError(res, 'Animal with this name already exists for this customer', 400);
     }
+  }
+
+  // Validate count if provided
+  if (count !== undefined && count < 1) {
+    return sendError(res, 'Count must be at least 1', 400);
   }
 
   // Update animal
   if (name) animal.name = name;
   if (type) animal.type = type;
+  if (count !== undefined) animal.count = count;
   if (age !== undefined) animal.age = age;
   if (weight !== undefined) animal.weight = weight;
   if (breed !== undefined) animal.breed = breed;
@@ -125,14 +325,14 @@ const updateAnimal = asyncHandler(async (req, res) => {
   }, 'Animal updated successfully');
 });
 
-// @desc    Delete animal (with JWT)
-// @route   DELETE /api/customer/animals/:animalId
-// @access  Private (Customer JWT)
+// @desc    Delete animal (No Auth Required)
+// @route   DELETE /api/customer-api/:customerId/animals/:animalId
+// @access  Public
 const deleteAnimal = asyncHandler(async (req, res) => {
-  const { animalId } = req.params;
+  const { customerId, animalId } = req.params;
 
-  // Get customer from JWT token
-  const customer = await Customer.findById(req.customer.id);
+  // Get customer by ID
+  const customer = await Customer.findById(customerId);
   if (!customer) {
     return sendError(res, 'Customer not found', 404);
   }
@@ -158,14 +358,14 @@ const deleteAnimal = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Get vaccinations for animal (with JWT)
-// @route   GET /api/customer/animals/:animalId/vaccinations
-// @access  Private (Customer JWT)
+// @desc    Get vaccinations for animal (No Auth Required)
+// @route   GET /api/customer-api/:customerId/animals/:animalId/vaccinations
+// @access  Public
 const getVaccinationsForAnimal = asyncHandler(async (req, res) => {
-  const { animalId } = req.params;
+  const { customerId, animalId } = req.params;
 
-  // Get customer from JWT token
-  const customer = await Customer.findById(req.customer.id);
+  // Get customer by ID
+  const customer = await Customer.findById(customerId);
   if (!customer) {
     return sendError(res, 'Customer not found', 404);
   }
@@ -176,15 +376,14 @@ const getVaccinationsForAnimal = asyncHandler(async (req, res) => {
     return sendError(res, 'Animal not found', 404);
   }
 
-  // Get vaccinations suitable for this animal type
+  // Get vaccinations suitable for this animal type (including inactive ones)
   const Vaccination = require('../models/Vaccination');
   const vaccinations = await Vaccination.find({
-    isActive: true,
     $or: [
       { animalTypes: animal.type },
       { animalTypes: 'all' }
     ]
-  }).select('name nameAr description descriptionAr price frequency sideEffects animalTypes ageRange');
+  }).select('name nameAr description descriptionAr price frequency sideEffects animalTypes ageRange isActive');
 
   // Filter by age if specified
   const suitableVaccinations = vaccinations.filter(vaccination => {
@@ -199,7 +398,8 @@ const getVaccinationsForAnimal = asyncHandler(async (req, res) => {
       id: animal._id,
       name: animal.name,
       type: animal.type,
-      age: animal.age
+      age: animal.age,
+      count: animal.count || 1
     },
     vaccinations: suitableVaccinations,
     customer: {
@@ -210,14 +410,15 @@ const getVaccinationsForAnimal = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Book vaccination (with JWT)
-// @route   POST /api/customer/bookings
-// @access  Private (Customer JWT)
+// @desc    Book vaccination (No Auth Required)
+// @route   POST /api/customer-api/:customerId/bookings
+// @access  Public
 const bookVaccination = asyncHandler(async (req, res) => {
+  const { customerId } = req.params;
   const { animalId, vaccinationId, branchId, appointmentDate, timeSlot, notes } = req.body;
 
-  // Get customer from JWT token
-  const customer = await Customer.findById(req.customer.id);
+  // Get customer by ID
+  const customer = await Customer.findById(customerId);
   if (!customer) {
     return sendError(res, 'Customer not found', 404);
   }
@@ -256,19 +457,24 @@ const bookVaccination = asyncHandler(async (req, res) => {
       name: animal.name,
       type: animal.type,
       age: animal.age,
-      weight: animal.weight
+      weight: animal.weight,
+      count: animal.count || 1
     },
     vaccination: {
       id: vaccination._id,
+      type: vaccination.type || 'vaccination', // Added required field
       name: vaccination.name,
       nameAr: vaccination.nameAr,
       price: vaccination.price,
-      duration: vaccination.duration
+      duration: vaccination.duration,
+      frequency: vaccination.frequency, // ✅ Add frequency
+      frequencyMonths: vaccination.frequencyMonths // ✅ Add custom frequency months
     },
     branch: branchId,
     appointmentDate: new Date(appointmentDate),
-    timeSlot,
+    appointmentTime: timeSlot, // Changed from timeSlot to appointmentTime
     status: 'pending',
+    price: vaccination.price, // Added required field
     totalAmount: vaccination.price,
     notes: notes || '',
     customerPhone: customer.phone
@@ -286,12 +492,14 @@ const bookVaccination = asyncHandler(async (req, res) => {
   }, 'Vaccination appointment booked successfully', 201);
 });
 
-// @desc    Get customer bookings (with JWT)
-// @route   GET /api/customer/bookings
-// @access  Private (Customer JWT)
+// @desc    Get customer bookings (No Auth Required)
+// @route   GET /api/customer-api/:customerId/bookings
+// @access  Public
 const getMyBookings = asyncHandler(async (req, res) => {
-  // Get customer from JWT token
-  const customer = await Customer.findById(req.customer.id);
+  const { customerId } = req.params;
+  
+  // Get customer by ID
+  const customer = await Customer.findById(customerId);
   if (!customer) {
     return sendError(res, 'Customer not found', 404);
   }
@@ -315,14 +523,14 @@ const getMyBookings = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Cancel booking (with JWT)
-// @route   PUT /api/customer/bookings/:bookingId/cancel
-// @access  Private (Customer JWT)
+// @desc    Cancel booking (No Auth Required)
+// @route   PUT /api/customer-api/:customerId/bookings/:bookingId/cancel
+// @access  Public
 const cancelBooking = asyncHandler(async (req, res) => {
-  const { bookingId } = req.params;
+  const { customerId, bookingId } = req.params;
 
-  // Get customer from JWT token
-  const customer = await Customer.findById(req.customer.id);
+  // Get customer by ID
+  const customer = await Customer.findById(customerId);
   if (!customer) {
     return sendError(res, 'Customer not found', 404);
   }
@@ -363,7 +571,111 @@ const cancelBooking = asyncHandler(async (req, res) => {
   }, 'Booking cancelled successfully');
 });
 
+// @desc    Create consultation (Customer)
+// @route   POST /api/customer-api/consultations
+// @access  Public (No auth required)
+const createCustomerConsultation = asyncHandler(async (req, res) => {
+  const Consultation = require('../models/Consultation');
+  
+  const { 
+    customer, 
+    doctor, 
+    consultationType, 
+    scheduledDate, 
+    scheduledTime, 
+    duration, 
+    symptoms, 
+    notes,
+    animalName,
+    animalType,
+    animalAge,
+    price
+  } = req.body;
+
+  // Validate required fields
+  if (!customer || !doctor || !scheduledDate || !scheduledTime || !symptoms) {
+    return sendError(res, 'Customer, doctor, date, time, and symptoms are required', 400);
+  }
+
+  // Check if customer exists
+  const customerExists = await Customer.findById(customer);
+  if (!customerExists) {
+    return sendError(res, 'Customer not found', 404);
+  }
+
+  // Check if doctor exists
+  const User = require('../models/User');
+  const doctorExists = await User.findById(doctor);
+  if (!doctorExists || doctorExists.role !== 'doctor') {
+    return sendError(res, 'Doctor not found', 404);
+  }
+
+  // Map consultation type from Flutter (call -> phone)
+  let validConsultationType = consultationType;
+  if (consultationType === 'call' || !consultationType) {
+    validConsultationType = 'phone';
+  }
+  
+  // Validate consultation type
+  if (!['phone', 'video', 'emergency'].includes(validConsultationType)) {
+    validConsultationType = 'phone'; // default to phone
+  }
+
+  // Create consultation
+  const consultation = await Consultation.create({
+    customer,
+    doctor,
+    consultationType: validConsultationType,
+    scheduledDate,
+    scheduledTime,
+    duration: duration || 30,
+    animal: {
+      name: animalName || 'Not specified',
+      type: animalType || 'other',
+      age: animalAge || 0,
+      symptoms: symptoms
+    },
+    customerPhone: customerExists.phone,
+    notes,
+    status: 'scheduled',
+    price: price || 100, // Default price if not provided
+    createdBy: doctor, // Use doctor as creator for customer bookings
+    paid: false
+  });
+
+  await consultation.populate([
+    { path: 'customer', select: 'name phone email' },
+    { path: 'doctor', select: 'name specialization phone' }
+  ]);
+
+  sendSuccess(res, consultation, 'Consultation booked successfully', 201);
+});
+
+// @desc    Get customer consultations
+// @route   GET /api/customer-api/consultations?customerId=xxx
+// @access  Public (No auth required)
+const getCustomerConsultations = asyncHandler(async (req, res) => {
+  const Consultation = require('../models/Consultation');
+  
+  const { customerId } = req.query;
+
+  if (!customerId) {
+    return sendError(res, 'Customer ID is required', 400);
+  }
+
+  const consultations = await Consultation.find({ customer: customerId })
+    .populate('doctor', 'name specialization phone')
+    .populate('customer', 'name phone')
+    .sort('-scheduledDate');
+
+  sendSuccess(res, consultations, 'Consultations retrieved successfully');
+});
+
 module.exports = {
+  registerCustomer,
+  loginCustomer,
+  getCustomerProfile,
+  updateCustomerProfile,
   addAnimal,
   getMyAnimals,
   updateAnimal,
@@ -371,5 +683,7 @@ module.exports = {
   getVaccinationsForAnimal,
   bookVaccination,
   getMyBookings,
-  cancelBooking
+  cancelBooking,
+  createCustomerConsultation,
+  getCustomerConsultations
 };

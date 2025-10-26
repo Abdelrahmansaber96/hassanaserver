@@ -89,6 +89,35 @@ const userSchema = new mongoose.Schema({
     max: 5,
     default: 0
   },
+  reviews: [{
+    customer: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Customer'
+    },
+    consultation: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Consultation'
+    },
+    rating: {
+      type: Number,
+      required: true,
+      min: 1,
+      max: 5
+    },
+    comment: {
+      type: String,
+      trim: true,
+      maxlength: [500, 'Comment cannot exceed 500 characters']
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
+  totalReviews: {
+    type: Number,
+    default: 0
+  },
   bio: {
     type: String,
     trim: true,
@@ -114,6 +143,26 @@ userSchema.pre('save', async function(next) {
 userSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
+
+// Calculate average rating
+userSchema.methods.calculateAverageRating = function() {
+  if (this.reviews.length === 0) {
+    this.rating = 0;
+    this.totalReviews = 0;
+  } else {
+    const sum = this.reviews.reduce((acc, review) => acc + review.rating, 0);
+    this.rating = Math.round((sum / this.reviews.length) * 10) / 10; // Round to 1 decimal
+    this.totalReviews = this.reviews.length;
+  }
+};
+
+// Update rating before saving
+userSchema.pre('save', function(next) {
+  if (this.isModified('reviews')) {
+    this.calculateAverageRating();
+  }
+  next();
+});
 
 // Remove password from JSON output
 userSchema.methods.toJSON = function() {

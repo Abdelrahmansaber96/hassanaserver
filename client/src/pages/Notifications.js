@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 const Notifications = () => {
   const { user } = useAuth();
   const [notifications, setNotifications] = useState([]);
+  const [customers, setCustomers] = useState([]); // إضافة state للعملاء
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState('أكتوبر 2025');
@@ -21,6 +22,8 @@ const Notifications = () => {
     type: 'general',
     priority: 'medium',
     recipients: 'all', // all, customers, doctors, staff, admins, specific
+    animalType: '', // تخصيص حسب نوع الحيوان (جديد)
+    branchSpecific: false, // إرسال لعملاء الفرع فقط (جديد)
     specificRecipients: [],
     channels: ['app'],
     scheduledAt: '',
@@ -69,28 +72,50 @@ const Notifications = () => {
     }
   };
 
+  // جلب العملاء للتخصيص (للطبيب: عملاء فرعه فقط، للأدمن: كل العملاء)
+  const fetchCustomers = async () => {
+    try {
+      const response = await authorizedFetch('/api/customers');
+      if (response.ok) {
+        const data = await response.json();
+        setCustomers(data.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching customers:', error);
+    }
+  };
+
   useEffect(() => {
     fetchNotifications();
+    fetchCustomers(); // جلب العملاء عند تحميل الصفحة
   }, []);
 
   // إرسال إشعار جديد
   const handleSendNotification = async (e) => {
     e.preventDefault();
     
-    if (!user || user.role !== 'admin') {
-      alert('فقط المدير يمكنه إرسال الإشعارات');
+    // السماح للأدمن والطبيب بإرسال الإشعارات
+    if (!user || (user.role !== 'admin' && user.role !== 'doctor')) {
+      alert('ليس لديك صلاحية لإرسال الإشعارات');
       return;
     }
 
     try {
-      console.log('Sending notification data:', formData);
+      // تجهيز البيانات للإرسال
+      const notificationData = {
+        ...formData,
+        userRole: user.role, // إرسال دور المستخدم
+        userBranch: user.branch || null // إرسال فرع الطبيب إن وجد
+      };
+
+      console.log('Sending notification data:', notificationData);
       
       const response = await authorizedFetch('/api/notifications', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(notificationData)
       });
 
       const data = await response.json();
@@ -105,6 +130,8 @@ const Notifications = () => {
           type: 'general',
           priority: 'medium',
           recipients: 'all',
+          animalType: '',
+          branchSpecific: false,
           specificRecipients: [],
           channels: ['app'],
           scheduledAt: '',
@@ -230,6 +257,63 @@ const Notifications = () => {
             </select>
           </div>
 
+          {/* تخصيص حسب نوع الحيوان (للعملاء فقط) */}
+          {formData.recipients === 'customers' && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+                🐪 تخصيص حسب نوع الحيوان (اختياري)
+              </label>
+              <select
+                name="animalType"
+                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-right bg-white"
+                value={formData.animalType}
+                onChange={handleChange}
+              >
+                <option value="">جميع أنواع الحيوانات</option>
+                <option value="camel">الإبل 🐪</option>
+                <option value="sheep">الأغنام 🐑</option>
+                <option value="goat">الماعز 🐐</option>
+                <option value="cow">الأبقار 🐄</option>
+                <option value="horse">الخيول 🐎</option>
+              </select>
+              <p className="text-xs text-blue-600 mt-2">
+                💡 اختر نوع حيوان معين لإرسال الإشعار فقط لأصحاب هذا النوع
+              </p>
+            </div>
+          )}
+
+          {/* تخصيص حسب الفرع (للطبيب) */}
+          {user?.role === 'doctor' && formData.recipients === 'customers' && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="branchSpecific"
+                  name="branchSpecific"
+                  checked={formData.branchSpecific}
+                  onChange={(e) => setFormData(prev => ({ ...prev, branchSpecific: e.target.checked }))}
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <label htmlFor="branchSpecific" className="text-sm font-medium text-gray-700">
+                  🏥 إرسال لعملاء فرعي فقط
+                </label>
+              </div>
+              <p className="text-xs text-green-600 mt-2 mr-6">
+                ✅ سيتم إرسال الإشعار للعملاء الذين لديهم حجوزات في فرعك فقط
+              </p>
+            </div>
+          )}
+
+          {/* معلومات للطبيب */}
+          {user?.role === 'doctor' && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <p className="text-sm text-yellow-800">
+                ℹ️ <strong>ملاحظة:</strong> كطبيب، يمكنك إرسال إشعارات للعملاء الذين يراجعون فرعك. 
+                يمكنك تخصيص الإشعار حسب نوع الحيوان أو إرساله لجميع عملاء الفرع.
+              </p>
+            </div>
+          )}
+
           {/* نوع الإشعار */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
@@ -278,11 +362,11 @@ const Notifications = () => {
             </button>
             <button
               type="submit"
-              disabled={user?.role !== 'admin'}
+              disabled={!user || (user.role !== 'admin' && user.role !== 'doctor')}
               className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               <Send className="h-5 w-5" />
-              إرسال
+              {user?.role === 'doctor' ? 'إرسال لعملاء الفرع' : 'إرسال'}
             </button>
           </div>
         </form>
@@ -372,11 +456,29 @@ const Notifications = () => {
                         {notification.recipients === 'admins' && 'المديرين'}
                         {notification.recipients === 'specific' && 'مستخدمين محددين'}
                       </div>
+                      {notification.metadata?.animalType && (
+                        <div className="text-xs text-blue-600 mt-1">
+                          {notification.metadata.animalType === 'camel' && '🐪 الإبل'}
+                          {notification.metadata.animalType === 'sheep' && '🐑 الأغنام'}
+                          {notification.metadata.animalType === 'goat' && '🐐 الماعز'}
+                          {notification.metadata.animalType === 'cow' && '🐄 الأبقار'}
+                          {notification.metadata.animalType === 'horse' && '🐎 الخيول'}
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm text-gray-600">
-                        {notification.metadata?.branch || 'كل الفروع [عرض التطعيم]'}
+                        {notification.metadata?.branch ? (
+                          <span className="text-green-600">🏥 فرع محدد</span>
+                        ) : (
+                          'كل الفروع'
+                        )}
                       </div>
+                      {notification.metadata?.branchSpecific && (
+                        <div className="text-xs text-green-600 mt-1">
+                          ✅ عملاء الفرع فقط
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <button className="p-2 hover:bg-gray-100 rounded-lg">

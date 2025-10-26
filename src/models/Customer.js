@@ -12,7 +12,20 @@ const customerSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Phone number is required'],
     unique: true,
-    trim: true
+    trim: true,
+    validate: {
+      validator: function(v) {
+        // Saudi phone number validation
+        return /^(05|5|\+9665|9665)[0-9]{8}$/.test(v.replace(/\s+/g, ''));
+      },
+      message: 'Invalid phone number format. Use Saudi format: 05xxxxxxxx'
+    }
+  },
+  email: {
+    type: String,
+    trim: true,
+    lowercase: true,
+    match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email']
   },
   address: {
     type: String,
@@ -33,6 +46,12 @@ const customerSchema = new mongoose.Schema({
       type: String,
       enum: ['camel', 'sheep', 'goat', 'cow', 'horse', 'other'],
       required: true
+    },
+    count: {
+      type: Number,
+      required: [true, 'Count is required'],
+      min: [1, 'Count must be at least 1'],
+      default: 1
     },
     age: {
       type: Number,
@@ -70,11 +89,18 @@ const customerSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Indexes for performance
+// Indexes for performance and uniqueness
 customerSchema.index({ name: 1 });
-customerSchema.index({ phone: 1 });
+customerSchema.index({ phone: 1 }, { unique: true }); // Ensure unique phone at DB level
 customerSchema.index({ city: 1 });
 customerSchema.index({ 'animals.type': 1 });
+
+// Add lastLogin field tracking
+customerSchema.add({
+  lastLogin: {
+    type: Date
+  }
+});
 
 // Virtual for customer's full address
 customerSchema.virtual('fullAddress').get(function() {

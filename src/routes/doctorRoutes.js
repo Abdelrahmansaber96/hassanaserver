@@ -5,14 +5,13 @@ const { checkActionPermission } = require('../middlewares/authorize');
 
 const router = express.Router();
 
-// Apply auth middleware to all routes
-router.use(auth);
+// Public routes (no authentication required) - for customer app
+router.get('/', getDoctors);  // ✅ Get all doctors - Public
+router.get('/:id', getDoctor); // ✅ Get single doctor - Public
 
-// Doctor routes
-router.get('/', checkActionPermission('read', 'doctor'), getDoctors);
-router.post('/', checkActionPermission('create', 'doctor'), createDoctor);
-router.get('/:id', checkActionPermission('read', 'doctor'), getDoctor);
-router.put('/:id', checkActionPermission('update', 'doctor'), updateDoctor);
-router.delete('/:id', checkActionPermission('delete', 'doctor'), deleteDoctor);
+// Protected routes (authentication required) - for admin/staff
+router.post('/', auth, checkActionPermission('create', 'doctor'), createDoctor);
+router.put('/:id', auth, checkActionPermission('update', 'doctor'), updateDoctor);
+router.delete('/:id', auth, checkActionPermission('delete', 'doctor'), deleteDoctor);
 
 module.exports = router;

@@ -158,7 +158,8 @@ const checkActionPermission = (action, resourceType) => {
         consultation: ['create', 'read', 'update'],
         offer: ['read'],
         notification: ['read'],
-        branch: ['read']
+        branch: ['read'],
+        doctor: ['read'] // الأطباء يمكنهم قراءة معلومات الأطباء
       }
     };
 

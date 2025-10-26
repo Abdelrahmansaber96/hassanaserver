@@ -20,7 +20,7 @@ router.get('/unread-count', getUnreadCount);
 
 router.route('/')
   .get(checkActionPermission('read', 'notification'), getNotifications)
-  .post(authorize('admin'), validate(notificationValidator), createNotification);
+  .post(authorize('admin', 'doctor'), validate(notificationValidator), createNotification);
 
 router.patch('/:id/read', markAsRead);
 

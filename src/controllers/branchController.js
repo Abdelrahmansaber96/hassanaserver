@@ -5,12 +5,12 @@ const { Pagination } = require('../utils/pagination');
 
 // @desc    Get all branches
 // @route   GET /api/branches
-// @access  Private
+// @access  Public (No authentication required)
 const getBranches = asyncHandler(async (req, res) => {
   let query = Branch.find();
 
-  // Apply role-based filtering
-  if (req.user.role === 'staff' && req.user.branch) {
+  // Apply role-based filtering only if user is authenticated
+  if (req.user && req.user.role === 'staff' && req.user.branch) {
     query = query.find({ _id: req.user.branch });
   }
 
@@ -28,7 +28,7 @@ const getBranches = asyncHandler(async (req, res) => {
 
 // @desc    Get single branch
 // @route   GET /api/branches/:id
-// @access  Private
+// @access  Public (No authentication required)
 const getBranch = asyncHandler(async (req, res) => {
   const branch = await Branch.findById(req.params.id)
     .populate('manager', 'name email phone specialization');

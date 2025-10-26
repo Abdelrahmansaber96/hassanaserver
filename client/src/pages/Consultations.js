@@ -52,17 +52,26 @@ const Consultations = () => {
 
       if (consultationsRes.ok) {
         const consultationsData = await consultationsRes.json();
-        setConsultations(consultationsData.consultations || []);
+        console.log('Consultations data:', consultationsData);
+        setConsultations(consultationsData.data || consultationsData.consultations || []);
+      } else {
+        console.error('Consultations fetch failed:', consultationsRes.status);
       }
       
       if (customersRes.ok) {
         const customersData = await customersRes.json();
-        setCustomers(customersData.customers || []);
+        console.log('Customers data:', customersData);
+        setCustomers(customersData.data || customersData.customers || []);
+      } else {
+        console.error('Customers fetch failed:', customersRes.status);
       }
       
       if (doctorsRes.ok) {
         const doctorsData = await doctorsRes.json();
-        setDoctors(doctorsData.doctors || []);
+        console.log('Doctors data:', doctorsData);
+        setDoctors(doctorsData.data || doctorsData.doctors || []);
+      } else {
+        console.error('Doctors fetch failed:', doctorsRes.status);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -124,10 +133,24 @@ const Consultations = () => {
     try {
       const token = localStorage.getItem('token');
       const url = editingConsultation 
-        ? `/api/consultations/${editingConsultation._id}`
-        : '/api/consultations';
+        ? `${API_BASE_URL}/api/consultations/${editingConsultation._id}`
+        : `${API_BASE_URL}/api/consultations`;
       
       const method = editingConsultation ? 'PUT' : 'POST';
+      
+      // تحويل أسماء الحقول لتتطابق مع الـ API
+      const requestData = {
+        customer: formData.customerId,
+        doctor: formData.doctorId,
+        consultationType: formData.consultationType,
+        scheduledDate: formData.scheduledDate,
+        scheduledTime: formData.scheduledTime,
+        duration: formData.duration,
+        notes: formData.notes,
+        symptoms: formData.symptoms,
+        diagnosis: formData.diagnosis,
+        recommendations: formData.recommendations
+      };
       
       const response = await fetch(url, {
         method,
@@ -135,13 +158,17 @@ const Consultations = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(requestData)
       });
 
       if (response.ok) {
         setShowModal(false);
         fetchData();
         alert(editingConsultation ? 'تم تحديث الاستشارة بنجاح' : 'تم إضافة الاستشارة بنجاح');
+      } else {
+        const errorData = await response.json();
+        console.error('Error saving consultation:', errorData);
+        alert(errorData.message || 'حدث خطأ أثناء الحفظ');
       }
     } catch (error) {
       console.error('Error saving consultation:', error);
@@ -153,7 +180,7 @@ const Consultations = () => {
   const updateConsultationStatus = async (consultationId, newStatus) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`/api/consultations/${consultationId}/status`, {
+      const response = await fetch(`${API_BASE_URL}/api/consultations/${consultationId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -165,6 +192,10 @@ const Consultations = () => {
       if (response.ok) {
         fetchData();
         alert('تم تحديث حالة الاستشارة بنجاح');
+      } else {
+        const errorData = await response.json();
+        console.error('Error response:', errorData);
+        alert('حدث خطأ أثناء تحديث الحالة');
       }
     } catch (error) {
       console.error('Error updating consultation status:', error);
@@ -183,7 +214,7 @@ const Consultations = () => {
   const getStatusColor = (status) => {
     switch (status) {
       case 'scheduled': return 'bg-blue-100 text-blue-800';
-      case 'in-progress': return 'bg-yellow-100 text-yellow-800';
+      case 'in_progress': return 'bg-yellow-100 text-yellow-800';
       case 'completed': return 'bg-green-100 text-green-800';
       case 'cancelled': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
@@ -194,7 +225,7 @@ const Consultations = () => {
   const getStatusText = (status) => {
     switch (status) {
       case 'scheduled': return 'مجدولة';
-      case 'in-progress': return 'جارية';
+      case 'in_progress': return 'جارية';
       case 'completed': return 'مكتملة';
       case 'cancelled': return 'ملغية';
       default: return status;
@@ -256,7 +287,7 @@ const Consultations = () => {
         >
           <option value="all">جميع الحالات</option>
           <option value="scheduled">مجدولة</option>
-          <option value="in-progress">جارية</option>
+          <option value="in_progress">جارية</option>
           <option value="completed">مكتملة</option>
           <option value="cancelled">ملغية</option>
         </select>
@@ -297,7 +328,7 @@ const Consultations = () => {
             </div>
             <div className="mr-4">
               <h3 className="text-lg font-semibold text-gray-900">
-                {consultations.filter(c => c.status === 'in-progress').length}
+                {consultations.filter(c => c.status === 'in_progress').length}
               </h3>
               <p className="text-gray-600">جارية</p>
             </div>
@@ -398,14 +429,14 @@ const Consultations = () => {
                     <div className="flex space-x-2">
                       {consultation.status === 'scheduled' && (
                         <button
-                          onClick={() => updateConsultationStatus(consultation._id, 'in-progress')}
+                          onClick={() => updateConsultationStatus(consultation._id, 'in_progress')}
                           className="text-yellow-600 hover:text-yellow-900"
                           title="بدء الاستشارة"
                         >
                           ▶
                         </button>
                       )}
-                      {consultation.status === 'in-progress' && (
+                      {consultation.status === 'in_progress' && (
                         <button
                           onClick={() => updateConsultationStatus(consultation._id, 'completed')}
                           className="text-green-600 hover:text-green-900"

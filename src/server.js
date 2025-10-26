@@ -329,7 +329,7 @@ app.use('/api/offers', apiLimiter, offerRoutes);
 app.use('/api/notifications', apiLimiter, notificationRoutes);
 app.use('/api/settings', apiLimiter, settingRoutes);
 app.use('/api/vaccinations', apiLimiter, vaccinationRoutes);
-app.use('/api/customer', customerApiRoutes); // No rate limit for customer API
+app.use('/api/customer-api', customerApiRoutes); // No rate limit for customer API (Flutter app)
 
 // 404 handler
 app.use('*', (req, res) => {

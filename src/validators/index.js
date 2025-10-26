@@ -61,6 +61,10 @@ const animalSchema = Joi.object({
     'any.only': 'Animal type must be one of: camel, sheep, goat, cow, other',
     'any.required': 'Animal type is required'
   }),
+  count: Joi.number().min(1).max(1000).optional().default(1).messages({
+    'number.min': 'Count must be at least 1',
+    'number.max': 'Count cannot exceed 1000'
+  }),
   age: Joi.number().min(0).max(50).optional(),
   weight: Joi.number().min(0).max(2000).optional(),
   breed: Joi.string().max(50).optional(),
@@ -247,29 +251,52 @@ const updateBranchValidator = branchValidator.fork(
 
 // Consultation validators
 const consultationValidator = Joi.object({
-  customer: Joi.string().hex().length(24).required(),
-  doctor: Joi.string().hex().length(24).required(),
+  customer: Joi.string().hex().length(24).optional(),
+  doctor: Joi.string().hex().length(24).optional(),
+  animal: Joi.object({
+    name: Joi.string().min(1).max(50).required(),
+    type: Joi.string().valid('camel', 'sheep', 'goat', 'cow', 'horse', 'other').required(),
+    age: Joi.number().min(0).max(50).optional(),
+    symptoms: Joi.string().min(10).max(500).required()
+  }).optional(),
+  scheduledDate: Joi.date().optional(),
+  scheduledTime: Joi.string().pattern(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).optional(),
+  duration: Joi.number().min(15).max(120).default(30),
+  consultationType: Joi.string().valid('phone', 'video', 'in-person', 'emergency').optional(),
+  priority: Joi.string().valid('low', 'medium', 'high', 'emergency').default('medium'),
+  customerPhone: Joi.string().pattern(/^(\+966|966|0)?[0-9]{9}$/).optional(),
+  price: Joi.number().min(0).optional(),
+  paymentMethod: Joi.string().valid('cash', 'card', 'bank_transfer', 'online').default('cash'),
+  notes: Joi.string().max(500).optional().allow(''),
+  symptoms: Joi.string().max(500).optional().allow(''),
+  diagnosis: Joi.string().max(1000).optional().allow(''),
+  recommendations: Joi.string().max(1000).optional().allow('')
+});
+
+const updateConsultationValidator = Joi.object({
+  customer: Joi.string().hex().length(24).optional(),
+  doctor: Joi.string().hex().length(24).optional(),
   animal: Joi.object({
     name: Joi.string().min(1).max(50).required(),
     type: Joi.string().valid('camel', 'sheep', 'goat', 'cow', 'other').required(),
     age: Joi.number().min(0).max(50).optional(),
     symptoms: Joi.string().min(10).max(500).required()
-  }).required(),
-  scheduledDate: Joi.date().min('now').required(),
-  scheduledTime: Joi.string().pattern(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).required(),
-  duration: Joi.number().min(15).max(120).default(30),
-  consultationType: Joi.string().valid('phone', 'video', 'emergency').default('phone'),
-  priority: Joi.string().valid('low', 'medium', 'high', 'emergency').default('medium'),
-  customerPhone: Joi.string().pattern(/^(\+966|966|0)?[0-9]{9}$/).required(),
-  price: Joi.number().min(0).required(),
-  paymentMethod: Joi.string().valid('cash', 'card', 'bank_transfer', 'online').default('cash'),
-  notes: Joi.string().max(500).optional()
+  }).optional(),
+  scheduledDate: Joi.date().optional(),
+  scheduledTime: Joi.string().pattern(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).optional(),
+  duration: Joi.number().min(15).max(120).optional(),
+  consultationType: Joi.string().valid('phone', 'video', 'emergency').optional(),
+  priority: Joi.string().valid('low', 'medium', 'high', 'emergency').optional(),
+  customerPhone: Joi.string().pattern(/^(\+966|966|0)?[0-9]{9}$/).optional(),
+  price: Joi.number().min(0).optional(),
+  paymentMethod: Joi.string().valid('cash', 'card', 'bank_transfer', 'online').optional(),
+  notes: Joi.string().max(500).optional(),
+  status: Joi.string().valid('scheduled', 'in_progress', 'completed', 'cancelled').optional(),
+  diagnosis: Joi.string().max(1000).optional(),
+  treatment: Joi.string().max(1000).optional(),
+  recommendations: Joi.string().max(1000).optional(),
+  symptoms: Joi.string().max(500).optional()
 });
-
-const updateConsultationValidator = consultationValidator.fork(
-  ['customer', 'doctor', 'animal', 'scheduledDate', 'scheduledTime', 'customerPhone', 'price'], 
-  (schema) => schema.optional()
-);
 
 const consultationResultValidator = Joi.object({
   diagnosis: Joi.string().min(10).max(1000).required(),
@@ -347,7 +374,15 @@ const notificationValidator = Joi.object({
     label: Joi.string().max(50).required(),
     action: Joi.string().max(100).required(),
     url: Joi.string().uri().optional()
-  })).optional()
+  })).optional(),
+  // New fields for filtering notifications
+  animalType: Joi.string().valid('camel', 'sheep', 'goat', 'cow', 'horse').optional().allow(''),
+  branchSpecific: Joi.boolean().optional(),
+  userRole: Joi.string().optional(),
+  userBranch: Joi.alternatives().try(
+    Joi.string().hex().length(24),
+    Joi.object()
+  ).optional().allow('', null)
 });
 
 // Validation middleware
@@ -428,6 +463,11 @@ const animalValidator = Joi.object({
   type: Joi.string().valid('camel', 'sheep', 'goat', 'cow', 'horse', 'other').required().messages({
     'any.only': 'Animal type must be one of: camel, sheep, goat, cow, horse, other',
     'any.required': 'Animal type is required'
+  }),
+  count: Joi.number().min(1).max(1000).required().messages({
+    'number.min': 'Count must be at least 1',
+    'number.max': 'Count cannot exceed 1000',
+    'any.required': 'Count is required'
   }),
   age: Joi.number().min(0).max(50).optional().messages({
     'number.min': 'Age cannot be negative',

@@ -4,8 +4,13 @@ const {
   getConsultation,
   createConsultation,
   updateConsultation,
-  addConsultationResult
+  addConsultationResult,
+  addDoctorReview
 } = require('../controllers/consultationController');
+const {
+  createCustomerConsultation,
+  getCustomerConsultations
+} = require('../controllers/customerApiController');
 const auth = require('../middlewares/auth');
 const { checkActionPermission } = require('../middlewares/authorize');
 const { validate } = require('../validators');
@@ -17,7 +22,17 @@ const {
 
 const router = express.Router();
 
-// Apply auth middleware to all routes
+// ========================================
+// PUBLIC ROUTES (No Authentication)
+// ========================================
+// Customer consultation routes - BEFORE auth middleware
+router.post('/customer/create', createCustomerConsultation);
+router.get('/customer/list', getCustomerConsultations);
+
+// ========================================
+// PROTECTED ROUTES (Require Authentication)
+// ========================================
+// Apply auth middleware to all routes below
 router.use(auth);
 
 // Consultation CRUD
@@ -35,5 +50,8 @@ router.patch('/:id/result',
   validate(consultationResultValidator), 
   addConsultationResult
 );
+
+// Add review to doctor (for customers via API)
+router.post('/:id/review', auth, addDoctorReview);
 
 module.exports = router;

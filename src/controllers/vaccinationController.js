@@ -8,7 +8,13 @@ const APIFilters = require('../utils/filters');
 // @route   GET /api/vaccinations
 // @access  Public
 const getVaccinations = asyncHandler(async (req, res) => {
-  let query = Vaccination.find({ isActive: true });
+  // Check if filtering by isActive status
+  let baseQuery = {};
+  if (req.query.isActive !== undefined) {
+    baseQuery.isActive = req.query.isActive === 'true';
+  }
+  
+  let query = Vaccination.find(baseQuery);
 
   // Apply filters
   const filters = new APIFilters(query, req.query)
@@ -32,7 +38,7 @@ const getVaccinations = asyncHandler(async (req, res) => {
 const getVaccination = asyncHandler(async (req, res) => {
   const vaccination = await Vaccination.findById(req.params.id);
 
-  if (!vaccination || !vaccination.isActive) {
+  if (!vaccination) {
     return sendNotFound(res, 'Vaccination');
   }
 
@@ -44,12 +50,16 @@ const getVaccination = asyncHandler(async (req, res) => {
 // @access  Public
 const getVaccinationsByAnimalType = asyncHandler(async (req, res) => {
   const { type } = req.params;
-  const { age } = req.query;
+  const { age, isActive } = req.query;
 
   let query = {
-    animalTypes: type,
-    isActive: true
+    animalTypes: type
   };
+
+  // Filter by isActive if provided
+  if (isActive !== undefined) {
+    query.isActive = isActive === 'true';
+  }
 
   // Filter by age if provided
   if (age) {
@@ -114,24 +124,43 @@ const deleteVaccination = asyncHandler(async (req, res) => {
 const getVaccinationStats = asyncHandler(async (req, res) => {
   const stats = await Vaccination.aggregate([
     {
-      $match: { isActive: true }
+      $facet: {
+        overall: [
+          {
+            $group: {
+              _id: null,
+              totalVaccinations: { $sum: 1 },
+              activeVaccinations: {
+                $sum: { $cond: ['$isActive', 1, 0] }
+              },
+              inactiveVaccinations: {
+                $sum: { $cond: ['$isActive', 0, 1] }
+              },
+              averagePrice: { $avg: '$price' },
+              minPrice: { $min: '$price' },
+              maxPrice: { $max: '$price' },
+              animalTypeDistribution: {
+                $push: '$animalTypes'
+              }
+            }
+          }
+        ]
+      }
     },
     {
-      $group: {
-        _id: null,
-        totalVaccinations: { $sum: 1 },
-        averagePrice: { $avg: '$price' },
-        minPrice: { $min: '$price' },
-        maxPrice: { $max: '$price' },
-        animalTypeDistribution: {
-          $push: '$animalTypes'
-        }
+      $project: {
+        overall: { $arrayElemAt: ['$overall', 0] }
       }
+    },
+    {
+      $replaceRoot: { newRoot: '$overall' }
     },
     {
       $project: {
         _id: 0,
         totalVaccinations: 1,
+        activeVaccinations: 1,
+        inactiveVaccinations: 1,
         averagePrice: { $round: ['$averagePrice', 2] },
         minPrice: 1,
         maxPrice: 1,
@@ -148,6 +177,8 @@ const getVaccinationStats = asyncHandler(async (req, res) => {
 
   const result = stats[0] || {
     totalVaccinations: 0,
+    activeVaccinations: 0,
+    inactiveVaccinations: 0,
     averagePrice: 0,
     minPrice: 0,
     maxPrice: 0,

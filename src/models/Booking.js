@@ -42,6 +42,11 @@ const bookingSchema = new mongoose.Schema({
     breed: {
       type: String,
       trim: true
+    },
+    count: {
+      type: Number,
+      min: 1,
+      default: 1
     }
   },
   vaccination: {
@@ -71,6 +76,15 @@ const bookingSchema = new mongoose.Schema({
     duration: {
       type: Number,
       default: 30
+    },
+    frequency: {
+      type: String,
+      enum: ['once', 'annually', 'biannually', 'monthly', 'custom'],
+      default: 'once'
+    },
+    frequencyMonths: {
+      type: Number,
+      default: 12
     },
     dosage: {
       type: String,
@@ -147,7 +161,7 @@ const bookingSchema = new mongoose.Schema({
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: false // Optional for customer bookings via app
   },
   updatedBy: {
     type: mongoose.Schema.Types.ObjectId,

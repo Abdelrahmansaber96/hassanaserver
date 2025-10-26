@@ -129,10 +129,55 @@ const addConsultationResult = asyncHandler(async (req, res) => {
   sendSuccess(res, consultation, 'Consultation result added successfully');
 });
 
+// @desc    Add review to doctor
+// @route   POST /api/consultations/:id/review
+// @access  Private (Customer only)
+const addDoctorReview = asyncHandler(async (req, res) => {
+  const consultation = await Consultation.findById(req.params.id);
+
+  if (!consultation) {
+    return sendNotFound(res, 'Consultation');
+  }
+
+  // Only completed consultations can be reviewed
+  if (consultation.status !== 'completed') {
+    return sendError(res, 'يمكن تقييم الاستشارات المكتملة فقط', 400);
+  }
+
+  // Check if customer already reviewed this consultation
+  const User = require('../models/User');
+  const doctor = await User.findById(consultation.doctor);
+
+  if (!doctor) {
+    return sendNotFound(res, 'Doctor');
+  }
+
+  const existingReview = doctor.reviews.find(
+    review => review.consultation && review.consultation.toString() === req.params.id
+  );
+
+  if (existingReview) {
+    return sendError(res, 'لقد قمت بالفعل بتقييم هذه الاستشارة', 400);
+  }
+
+  // Add review
+  doctor.reviews.push({
+    customer: req.body.customerId || consultation.customer,
+    consultation: consultation._id,
+    rating: req.body.rating,
+    comment: req.body.comment
+  });
+
+  await doctor.save();
+
+  sendSuccess(res, doctor, 'تم إضافة التقييم بنجاح');
+});
+
 module.exports = {
   getConsultations,
   getConsultation,
   createConsultation,
   updateConsultation,
-  addConsultationResult
+  addConsultationResult,
+  addDoctorReview
 };

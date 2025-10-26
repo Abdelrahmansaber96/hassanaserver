@@ -14,20 +14,14 @@ const { branchValidator, updateBranchValidator } = require('../validators');
 
 const router = express.Router();
 
-// Apply auth middleware to all routes
-router.use(auth);
+// Public routes (no authentication required)
+router.get('/', getBranches);  // ✅ Get all branches - Public
+router.get('/:id', getBranch); // ✅ Get single branch - Public
 
-// Branch CRUD
-router.route('/')
-  .get(checkActionPermission('read', 'branch'), getBranches)
-  .post(authorize('admin'), validate(branchValidator), createBranch);
-
-router.route('/:id')
-  .get(checkActionPermission('read', 'branch'), getBranch)
-  .put(authorize('admin'), validate(updateBranchValidator), updateBranch)
-  .delete(authorize('admin'), deleteBranch);
-
-// Branch statistics
-router.get('/:id/stats', checkActionPermission('read', 'branch'), getBranchStats);
+// Protected routes (authentication required)
+router.post('/', auth, authorize('admin'), validate(branchValidator), createBranch);
+router.put('/:id', auth, authorize('admin'), validate(updateBranchValidator), updateBranch);
+router.delete('/:id', auth, authorize('admin'), deleteBranch);
+router.get('/:id/stats', auth, checkActionPermission('read', 'branch'), getBranchStats);
 
 module.exports = router;
