@@ -1,6 +1,7 @@
 const Customer = require('../models/Customer');
 const { asyncHandler } = require('../utils/AppError');
 const { sendSuccess, sendError, sendNotFound } = require('../utils/helpers');
+const whatsappService = require('../services/whatsappService');
 
 // @desc    Register new customer (Simple - No Password)
 // @route   POST /api/customer-api/register
@@ -482,13 +483,56 @@ const bookVaccination = asyncHandler(async (req, res) => {
 
   await booking.save();
 
+  // Populate branch and customer to get full details
+  await booking.populate('branch', 'name phone');
+  await booking.populate('customer', 'name phone');
+
+  console.log('🔔 Attempting to send WhatsApp notification...');
+  console.log('📍 Branch data:', booking.branch);
+  console.log('👤 Customer data:', booking.customer);
+
+  // Try to send WhatsApp notification to branch (don't fail booking if it fails)
+  try {
+    if (booking.branch && booking.branch.phone) {
+      // إرسال إلى رقم الاختبار المسجل
+      const testPhoneNumber = '966540217796'; // رقم الاختبار
+      console.log('📱 Sending WhatsApp to test number:', testPhoneNumber);
+      console.log('📍 Branch:', booking.branch.name);
+      
+      const result = await whatsappService.sendNewBookingNotificationToBranch(
+        booking, 
+        testPhoneNumber,
+        booking.branch.name
+      );
+      
+      if (!result.success) {
+        console.log('❌ WhatsApp failed:', result.error);
+        console.log('💡 Make sure 966540217796 is added to Test Numbers in Meta Developer Console');
+      } else {
+        console.log('✅ WhatsApp sent successfully!');
+      }
+      
+      console.log('📨 WhatsApp result:', result);
+    } else {
+      console.log('⚠️ Branch phone not available');
+    }
+  } catch (whatsappError) {
+    console.error('❌ WhatsApp notification failed:', whatsappError);
+    // Continue - booking was successful even if notification failed
+  }
+
   // Update customer booking stats
   customer.totalBookings = (customer.totalBookings || 0) + 1;
   customer.lastBookingDate = new Date();
   await customer.save();
 
+  // Convert booking to plain object and fix customer field for response
+  const bookingResponse = booking.toObject();
+  bookingResponse.customer = customer._id; // إرجاع ID فقط للـ Flutter
+  bookingResponse.branch = booking.branch._id; // إرجاع ID فقط للفرع
+
   sendSuccess(res, {
-    booking: booking
+    booking: bookingResponse
   }, 'Vaccination appointment booked successfully', 201);
 });
 
