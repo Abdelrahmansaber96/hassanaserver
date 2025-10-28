@@ -44,7 +44,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // Serve static files
-app.use(express.static(path.join(__dirname, '../public')));
+app.use(express.static(path.join(__dirname, '../client/build')));
 
 // Logging
 if (process.env.NODE_ENV === 'development') {
@@ -87,13 +87,13 @@ const authLimiter = rateLimit({
 });
 
 // Root route - Redirect to dashboard
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '../public/index.html'));
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../client/build/index.html'));
 });
 
 // Login page route
-app.get('/login', (req, res) => {
-  res.sendFile(path.join(__dirname, '../public/pages/login.html'));
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../client/build/index.html'));
 });
 
 // Old API info route for developers
