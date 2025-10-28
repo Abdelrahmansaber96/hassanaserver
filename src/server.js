@@ -5,7 +5,13 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const morgan = require('morgan');
 require('express-async-errors');
-require('dotenv').config();
+
+// Load environment variables from .env file
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+
+console.log('🔑 Environment Variables Loaded:');
+console.log('  - WHATSAPP_API_KEY:', process.env.WHATSAPP_API_KEY ? 'EXISTS' : 'MISSING');
+console.log('  - WHATSAPP_PHONE_ID:', process.env.WHATSAPP_PHONE_ID || 'MISSING');
 
 const connectDB = require('./config/database');
 const errorHandler = require('./middlewares/errorHandler');
