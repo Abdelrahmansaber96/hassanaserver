@@ -8,7 +8,6 @@
     "dev": "nodemon src/server.js",
     "seed": "node src/seeds/index.js",
     "test": "jest",
-    "client": "cd client && npm start",
     "server": "npm run dev",
     "both": "concurrently \"npm run server\" \"npm run client\"",
     "build": "cd client && npm run build",
